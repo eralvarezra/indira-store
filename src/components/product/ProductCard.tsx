@@ -44,7 +44,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <>
       <div
-        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 active:scale-[0.98] cursor-pointer"
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-lg active:scale-[0.98] cursor-pointer"
         onClick={() => setShowDetail(true)}
       >
         {/* Image Container */}
@@ -87,26 +87,26 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Content */}
-        <div className="p-3">
-          <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">
+        <div className="p-3 sm:p-4">
+          <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1 line-clamp-1">
             {product.name}
           </h3>
-          <p className="text-gray-500 text-xs mb-2 line-clamp-2 min-h-[2rem]">
+          <p className="text-gray-500 text-xs sm:text-sm mb-2 line-clamp-2 min-h-[2rem]">
             {product.description}
           </p>
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-col min-w-0">
               {hasDiscount ? (
                 <>
-                  <span className="text-xs text-gray-400 line-through truncate">
+                  <span className="text-xs sm:text-sm text-gray-400 line-through truncate">
                     {formatPrice(originalPrice)}
                   </span>
-                  <span className="text-base font-bold text-indigo-600 truncate">
+                  <span className="text-base sm:text-lg font-bold text-indigo-600 truncate">
                     {formatPrice(discountedPrice)}
                   </span>
                 </>
               ) : (
-                <span className="text-base font-bold text-indigo-600 truncate">
+                <span className="text-base sm:text-lg font-bold text-indigo-600 truncate">
                   {formatPrice(originalPrice)}
                 </span>
               )}
@@ -143,7 +143,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 onClick={handleAdd}
                 disabled={isOutOfStock}
                 className={clsx(
-                  'px-3 py-2 rounded-full font-medium text-xs transition-all duration-200 touch-target',
+                  'px-3 py-2 rounded-full font-medium text-xs sm:text-sm transition-all duration-200 touch-target',
                   isOutOfStock
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-indigo-600 text-white active:bg-indigo-700 active:scale-95',

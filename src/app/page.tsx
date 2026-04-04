@@ -49,13 +49,13 @@ function CatalogContent() {
     <div className="min-h-screen bg-gray-50 safe-top">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-30 safe-top">
-        <div className="px-4 py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between mb-3">
             <a href="/" className="flex items-center">
               <img
                 src="/logo.png"
                 alt="Indira Store"
-                className="h-32 w-auto"
+                className="h-20 sm:h-24 md:h-28 lg:h-32 w-auto"
               />
             </a>
             <a
@@ -81,7 +81,7 @@ function CatalogContent() {
 
         {/* Categories */}
         {!isLoading && products.length > 0 && (
-          <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2">
               <button
                 onClick={() => setSelectedCategory('all')}
@@ -114,7 +114,7 @@ function CatalogContent() {
       </header>
 
       {/* Main Content */}
-      <main className="px-3 py-4 pb-28">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-28">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
