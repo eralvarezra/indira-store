@@ -2,7 +2,7 @@
 
 import { Product, SKINCARE_CATEGORIES, getCategoryInfo } from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
-import { X, Plus, Minus, ShoppingCart } from 'lucide-react'
+import { X, Plus, Minus, ShoppingCart, Clock, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 
@@ -101,12 +101,13 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               </div>
             )}
 
-            {/* Stock Badge */}
+            {/* Pre-order Badge for out of stock */}
             {isOutOfStock && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <span className="bg-red-500 text-white px-4 py-2 rounded-full font-medium">
-                  Agotado
-                </span>
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="bg-amber-500 text-white px-4 py-2 rounded-full font-medium flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Pre-pedido disponible
+                </div>
               </div>
             )}
           </div>
@@ -154,16 +155,30 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             )}
 
             {/* Stock info */}
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+            <div className="flex flex-col gap-2">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium w-fit ${
                 product.stock > 10
                   ? 'bg-green-100 text-green-700'
                   : product.stock > 0
                     ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-red-100 text-red-700'
+                    : 'bg-amber-100 text-amber-700'
               }`}>
-                {isOutOfStock ? 'Sin stock' : `${product.stock} disponibles`}
+                {isOutOfStock ? 'Pre-pedido disponible' : `${product.stock} disponibles`}
               </span>
+
+              {/* Pre-order message for out of stock */}
+              {isOutOfStock && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Producto disponible para pre-pedido</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Este producto está actualmente agotado para entrega inmediata.
+                      Puedes hacer tu pedido y te lo entregaremos en aproximadamente 1.5 semanas.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -181,8 +196,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
               <button
                 onClick={() => addItem(product)}
-                disabled={isOutOfStock || quantity >= product.stock}
-                className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
+                className={clsx(
+                  "w-14 h-14 rounded-full flex items-center justify-center transition-colors touch-target",
+                  isOutOfStock
+                    ? "bg-amber-500 hover:bg-amber-400 active:bg-amber-600"
+                    : "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700"
+                )}
               >
                 <Plus className="w-6 h-6 text-white" />
               </button>
@@ -190,16 +209,22 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
           ) : (
             <button
               onClick={handleAdd}
-              disabled={isOutOfStock}
               className={clsx(
-                'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target',
+                'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target flex items-center justify-center gap-2',
                 isOutOfStock
-                  ? 'bg-gray-300 cursor-not-allowed'
+                  ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600'
                   : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700',
                 isAdding && 'scale-[1.02]'
               )}
             >
-              {isOutOfStock ? 'Producto Agotado' : 'Agregar al Carrito'}
+              {isOutOfStock ? (
+                <>
+                  <Clock className="w-5 h-5" />
+                  Hacer Pre-pedido
+                </>
+              ) : (
+                'Agregar al Carrito'
+              )}
             </button>
           )}
         </div>

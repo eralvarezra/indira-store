@@ -2,11 +2,35 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown } from 'lucide-react'
+import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { Product, Order, SKINCARE_CATEGORIES, CategoryId } from '@/types/database.types'
 
-type Tab = 'products' | 'orders' | 'promos' | 'settings'
+type Tab = 'products' | 'orders' | 'promos' | 'reports' | 'settings'
+
+interface WeekCycle {
+  id: string
+  start_date: string
+  end_date: string
+  status: 'open' | 'closed'
+  report_sent: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface WeeklyReport {
+  cycleId: string
+  startDate: string
+  endDate: string
+  startDateFormatted: string
+  endDateFormatted: string
+  totalOrders: number
+  inStockOrders: number
+  preOrderCount: number
+  inStockCount: number
+  productCounts: Record<string, number>
+  totalRevenue: number
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -34,6 +58,12 @@ export default function AdminDashboard() {
   const [bulkDiscount, setBulkDiscount] = useState('')
   const [isUpdatingDiscount, setIsUpdatingDiscount] = useState(false)
 
+  // Week cycles and reports state
+  const [weekCycles, setWeekCycles] = useState<WeekCycle[]>([])
+  const [selectedCycleId, setSelectedCycleId] = useState<string>('all')
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
+  const [isLoadingReport, setIsLoadingReport] = useState(false)
+
   useEffect(() => {
     checkAuth()
     fetchData()
@@ -53,10 +83,11 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const [productsRes, ordersRes, settingsRes] = await Promise.all([
+      const [productsRes, ordersRes, settingsRes, cyclesRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/orders'),
         fetch('/api/admin/settings'),
+        fetch('/api/week-cycles'),
       ])
 
       if (productsRes.ok) {
@@ -72,6 +103,11 @@ export default function AdminDashboard() {
       if (settingsRes.ok) {
         const data = await settingsRes.json()
         setSettings(data.settings || { telegram_bot_token: '', telegram_chat_id: '' })
+      }
+
+      if (cyclesRes.ok) {
+        const data = await cyclesRes.json()
+        setWeekCycles(data.cycles || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -285,6 +321,54 @@ export default function AdminDashboard() {
     }
   }
 
+  // Weekly report functions
+  const fetchWeeklyReport = async () => {
+    setIsLoadingReport(true)
+    try {
+      const response = await fetch('/api/cron/weekly-report')
+      if (response.ok) {
+        const data = await response.json()
+        setWeeklyReport(data.report)
+      }
+    } catch (error) {
+      console.error('Error fetching weekly report:', error)
+    } finally {
+      setIsLoadingReport(false)
+    }
+  }
+
+  const handleGenerateReport = async () => {
+    if (!confirm('¿Estás seguro de cerrar esta semana y generar el reporte? Esta acción no se puede deshacer.')) return
+
+    setIsLoadingReport(true)
+    try {
+      const cronSecret = process.env.NEXT_PUBLIC_CRON_SECRET
+      const response = await fetch('/api/cron/weekly-report', {
+        method: 'POST',
+        headers: cronSecret ? { 'Authorization': `Bearer ${cronSecret}` } : {},
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setWeeklyReport(data.report)
+        fetchData()
+        alert('Reporte semanal generado y enviado por Telegram')
+      } else {
+        alert('Error al generar el reporte')
+      }
+    } catch (error) {
+      console.error('Error generating report:', error)
+      alert('Error al generar el reporte')
+    } finally {
+      setIsLoadingReport(false)
+    }
+  }
+
+  // Filter orders by week cycle
+  const filteredOrders = selectedCycleId === 'all'
+    ? orders
+    : orders.filter(order => order.week_cycle_id === selectedCycleId)
+
   const openEditModal = (product: Product) => {
     setEditingProduct(product)
     setProductForm({
@@ -354,6 +438,7 @@ export default function AdminDashboard() {
               { id: 'products' as Tab, label: 'Productos', icon: Package },
               { id: 'orders' as Tab, label: 'Pedidos', icon: ShoppingBag },
               { id: 'promos' as Tab, label: 'Promos', icon: Tag },
+              { id: 'reports' as Tab, label: 'Reportes', icon: BarChart3 },
               { id: 'settings' as Tab, label: 'Config', icon: Settings },
             ].map((tab) => (
               <button
@@ -463,83 +548,119 @@ export default function AdminDashboard() {
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div>
-                <h2 className="text-lg font-semibold mb-6">Historial de Pedidos</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">Historial de Pedidos</h2>
+                  {/* Week Cycle Filter */}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <select
+                      value={selectedCycleId}
+                      onChange={(e) => setSelectedCycleId(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-indigo-500 outline-none"
+                    >
+                      <option value="all">Todos los pedidos</option>
+                      {weekCycles.map((cycle) => (
+                        <option key={cycle.id} value={cycle.id}>
+                          {new Date(cycle.start_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
+                          {cycle.status === 'open' ? ' (Actual)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold text-gray-900">{order.customer_name}</h3>
-                            <p className="text-sm text-gray-500">{order.phone}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className={clsx(
-                              'px-3 py-1 rounded-full text-xs font-medium',
-                              order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
-                              order.status === 'confirmed' && 'bg-green-100 text-green-700',
-                              order.status === 'cancelled' && 'bg-red-100 text-red-700'
-                            )}>
-                              {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Confirmado' : 'Cancelado'}
-                            </span>
-                            <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
-                          </div>
-                        </div>
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          {Array.isArray(order.items) && (order.items as { name: string; quantity: number; price: number }[]).map((item, index) => (
-                            <div key={index} className="flex items-center justify-between text-sm py-1">
-                              <span>{item.name} x{item.quantity}</span>
-                              <span className="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
+                  {filteredOrders.map((order) => {
+                    const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
+                    const hasPreOrder = orderItems.some(item => item.type === 'pre_order')
+
+                    return (
+                      <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{order.customer_name}</h3>
+                              <p className="text-sm text-gray-500">{order.phone}</p>
                             </div>
-                          ))}
-                          <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
-                            <span>Total</span>
-                            <span className="text-indigo-600">{formatPrice(order.total)}</span>
+                            <div className="text-right">
+                              <span className={clsx(
+                                'px-3 py-1 rounded-full text-xs font-medium',
+                                order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
+                                order.status === 'confirmed' && 'bg-green-100 text-green-700',
+                                order.status === 'cancelled' && 'bg-red-100 text-red-700'
+                              )}>
+                                {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Confirmado' : 'Cancelado'}
+                              </span>
+                              {hasPreOrder && (
+                                <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                  Pre-pedido
+                                </span>
+                              )}
+                              <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
+                            </div>
                           </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            {orderItems.map((item, index) => (
+                              <div key={index} className="flex items-center justify-between text-sm py-1">
+                                <span className="flex items-center gap-2">
+                                  {item.name} x{item.quantity}
+                                  {item.type === 'pre_order' && (
+                                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
+                                      Pre-pedido
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
+                              </div>
+                            ))}
+                            <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
+                              <span>Total</span>
+                              <span className="text-indigo-600">{formatPrice(order.total)}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          {order.status === 'pending' && (
+                            <div className="flex gap-2 mt-4">
+                              <button
+                                onClick={() => handleUpdateOrderStatus(order.id, 'confirmed')}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                              >
+                                <Check className="w-4 h-4" />
+                                Confirmar Entrega
+                              </button>
+                              <button
+                                onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
+
+                          {order.status === 'confirmed' && (
+                            <div className="flex items-center gap-2 mt-4 p-3 bg-green-50 rounded-lg">
+                              <Check className="w-5 h-5 text-green-600" />
+                              <span className="text-sm text-green-700">Pedido entregado - Stock actualizado</span>
+                            </div>
+                          )}
+
+                          {order.status === 'cancelled' && (
+                            <div className="flex items-center gap-2 mt-4 p-3 bg-red-50 rounded-lg">
+                              <XCircle className="w-5 h-5 text-red-600" />
+                              <span className="text-sm text-red-700">Pedido cancelado - Stock devuelto</span>
+                            </div>
+                          )}
                         </div>
-
-                        {/* Action Buttons */}
-                        {order.status === 'pending' && (
-                          <div className="flex gap-2 mt-4">
-                            <button
-                              onClick={() => handleUpdateOrderStatus(order.id, 'confirmed')}
-                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                            >
-                              <Check className="w-4 h-4" />
-                              Confirmar Entrega
-                            </button>
-                            <button
-                              onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                            >
-                              <XCircle className="w-4 h-4" />
-                              Cancelar
-                            </button>
-                          </div>
-                        )}
-
-                        {order.status === 'confirmed' && (
-                          <div className="flex items-center gap-2 mt-4 p-3 bg-green-50 rounded-lg">
-                            <Check className="w-5 h-5 text-green-600" />
-                            <span className="text-sm text-green-700">Pedido entregado - Stock actualizado</span>
-                          </div>
-                        )}
-
-                        {order.status === 'cancelled' && (
-                          <div className="flex items-center gap-2 mt-4 p-3 bg-red-50 rounded-lg">
-                            <XCircle className="w-5 h-5 text-red-600" />
-                            <span className="text-sm text-red-700">Pedido cancelado - Stock devuelto</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
-                {orders.length === 0 && (
+                {filteredOrders.length === 0 && (
                   <div className="text-center py-12">
                     <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay pedidos aún.</p>
+                    <p className="text-gray-500">No hay pedidos para mostrar.</p>
                   </div>
                 )}
               </div>
@@ -699,6 +820,164 @@ export default function AdminDashboard() {
                       <p className="text-gray-500">No hay productos para promocionar.</p>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Reports Tab */}
+            {activeTab === 'reports' && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">Reporte Semanal</h2>
+                  <button
+                    onClick={() => fetchWeeklyReport()}
+                    disabled={isLoadingReport}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingReport ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="w-4 h-4" />
+                        Ver Reporte Actual
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Current Week Info */}
+                {weekCycles.find(c => c.status === 'open') && (
+                  <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Semana Actual</h3>
+                        <p className="text-sm text-gray-500">
+                          {new Date(weekCycles.find(c => c.status === 'open')!.start_date).toLocaleDateString('es-CR', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })} - {new Date(weekCycles.find(c => c.status === 'open')!.end_date).toLocaleDateString('es-CR', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          Activa
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <button
+                        onClick={handleGenerateReport}
+                        disabled={isLoadingReport}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        <Clock className="w-4 h-4" />
+                        Cerrar Semana y Generar Reporte
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Esto enviará el reporte a Telegram y creará una nueva semana.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Weekly Report */}
+                {weeklyReport && (
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b border-gray-100">
+                      <h3 className="font-semibold text-gray-900">Resumen de la Semana</h3>
+                      <p className="text-sm text-gray-500">
+                        {weeklyReport.startDateFormatted} - {weeklyReport.endDateFormatted}
+                      </p>
+                    </div>
+
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-indigo-50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-indigo-600">{weeklyReport.totalOrders}</div>
+                        <div className="text-xs text-gray-600">Pedidos Totales</div>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-green-600">{weeklyReport.inStockCount}</div>
+                        <div className="text-xs text-gray-600">En Stock</div>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-amber-600">{weeklyReport.preOrderCount}</div>
+                        <div className="text-xs text-gray-600">Pre-pedidos</div>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-3 text-center">
+                        <div className="text-lg font-bold text-purple-600">{formatPrice(weeklyReport.totalRevenue)}</div>
+                        <div className="text-xs text-gray-600">Ingresos</div>
+                      </div>
+                    </div>
+
+                    {/* Top Products */}
+                    {Object.keys(weeklyReport.productCounts).length > 0 && (
+                      <div className="p-4 border-t border-gray-100">
+                        <h4 className="font-medium text-gray-900 mb-3">Productos Más Vendidos</h4>
+                        <div className="space-y-2">
+                          {Object.entries(weeklyReport.productCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([name, count]) => (
+                              <div key={name} className="flex items-center justify-between text-sm">
+                                <span className="text-gray-700">{name}</span>
+                                <span className="font-medium text-gray-900">{count} unidades</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {weeklyReport.preOrderCount > 0 && (
+                      <div className="p-4 bg-amber-50 border-t border-amber-100">
+                        <div className="flex items-start gap-2">
+                          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-800">Acción Requerida</p>
+                            <p className="text-xs text-amber-700 mt-1">
+                              Hay {weeklyReport.preOrderCount} productos en pre-pedido que necesitan ser ordenados a proveedores.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Past Weeks */}
+                <div className="mt-6">
+                  <h3 className="font-semibold text-gray-900 mb-4">Semanas Anteriores</h3>
+                  <div className="space-y-3">
+                    {weekCycles.filter(c => c.status === 'closed').map((cycle) => (
+                      <div key={cycle.id} className="bg-white rounded-xl shadow-sm border p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {new Date(cycle.start_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {cycle.report_sent ? 'Reporte enviado' : 'Pendiente'}
+                            </p>
+                          </div>
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            Cerrada
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {weekCycles.filter(c => c.status === 'closed').length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        No hay semanas anteriores
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

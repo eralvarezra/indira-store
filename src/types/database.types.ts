@@ -68,6 +68,7 @@ export interface Database {
           items: Json
           total: number
           status: string
+          week_cycle_id: string | null
           created_at: string
         }
         Insert: {
@@ -77,6 +78,7 @@ export interface Database {
           items: Json
           total: number
           status?: string
+          week_cycle_id?: string | null
           created_at?: string
         }
         Update: {
@@ -86,7 +88,37 @@ export interface Database {
           items?: Json
           total?: number
           status?: string
+          week_cycle_id?: string | null
           created_at?: string
+        }
+      }
+      week_cycles: {
+        Row: {
+          id: string
+          start_date: string
+          end_date: string
+          status: string
+          report_sent: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          start_date: string
+          end_date: string
+          status?: string
+          report_sent?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          start_date?: string
+          end_date?: string
+          status?: string
+          report_sent?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
       settings: {
@@ -118,6 +150,7 @@ export interface Database {
 
 export type Product = Database['public']['Tables']['products']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
+export type WeekCycle = Database['public']['Tables']['week_cycles']['Row']
 export type Setting = Database['public']['Tables']['settings']['Row']
 
 export interface CartItem {
@@ -125,11 +158,13 @@ export interface CartItem {
   quantity: number
 }
 
+// Order item type - includes whether it's in_stock or pre_order
 export interface OrderItem {
   product_id: string
   name: string
   price: number
   quantity: number
+  type: 'in_stock' | 'pre_order'
 }
 
 // Helper to calculate discounted price
@@ -150,4 +185,9 @@ export function formatPriceWithDiscount(price: number, discountPercentage: numbe
 // Helper to get category info
 export function getCategoryInfo(categoryId: string) {
   return SKINCARE_CATEGORIES.find(c => c.id === categoryId) || null
+}
+
+// Helper to determine order item type based on stock
+export function getOrderItemType(stock: number): 'in_stock' | 'pre_order' {
+  return stock > 0 ? 'in_stock' : 'pre_order'
 }

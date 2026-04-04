@@ -24,6 +24,23 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC);
 
 -- =============================================
+-- WEEK CYCLES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS week_cycles (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    report_sent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_week_cycles_status ON week_cycles(status);
+CREATE INDEX IF NOT EXISTS idx_week_cycles_dates ON week_cycles(start_date, end_date);
+
+-- =============================================
 -- ORDERS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS orders (
@@ -33,6 +50,7 @@ CREATE TABLE IF NOT EXISTS orders (
     items JSONB NOT NULL DEFAULT '[]',
     total DECIMAL(10, 2) NOT NULL DEFAULT 0,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    week_cycle_id UUID REFERENCES week_cycles(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
@@ -60,6 +78,7 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE week_cycles ENABLE ROW LEVEL SECURITY;
 
 -- Products: Allow public read access
 CREATE POLICY "Allow public read access on products"
@@ -94,6 +113,19 @@ CREATE POLICY "Allow service role full access on settings"
     USING (true)
     WITH CHECK (true);
 
+-- Week Cycles: Allow service role full access
+CREATE POLICY "Allow service role full access on week_cycles"
+    ON week_cycles FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- Week Cycles: Allow public read access
+CREATE POLICY "Allow public read access on week_cycles"
+    ON week_cycles FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
 -- =============================================
 -- FUNCTIONS AND TRIGGERS
 -- =============================================
@@ -123,6 +155,11 @@ CREATE TRIGGER settings_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
+CREATE TRIGGER week_cycles_updated_at
+    BEFORE UPDATE ON week_cycles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
 -- =============================================
 -- SEED DATA (Optional)
 -- =============================================
@@ -135,6 +172,47 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Add discount_percentage column if it doesn't exist (for existing databases)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percentage INTEGER DEFAULT 0;
+
+-- Add category column if it doesn't exist (for existing databases)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'other';
+
+-- Add week_cycle_id column to orders if it doesn't exist (for existing databases)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS week_cycle_id UUID REFERENCES week_cycles(id);
+
+-- =============================================
+-- FUNCTION TO GET OR CREATE CURRENT WEEK CYCLE
+-- =============================================
+CREATE OR REPLACE FUNCTION get_or_create_week_cycle()
+RETURNS UUID AS $$
+DECLARE
+    current_cycle_id UUID;
+    week_start TIMESTAMP WITH TIME ZONE;
+    week_end TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Get current date in UTC
+    -- Calculate week start (Saturday 00:00) and end (Friday 23:59)
+    -- Saturday = day 6 in PostgreSQL's DOW
+    week_start := DATE_TRUNC('week', TIMEZONE('utc', NOW())) - INTERVAL '2 days';
+    week_end := week_start + INTERVAL '6 days 23 hours 59 minutes 59 seconds';
+
+    -- Check if current cycle exists
+    SELECT id INTO current_cycle_id
+    FROM week_cycles
+    WHERE start_date <= TIMEZONE('utc', NOW())
+    AND end_date >= TIMEZONE('utc', NOW())
+    AND status = 'open'
+    LIMIT 1;
+
+    -- If no cycle exists, create one
+    IF current_cycle_id IS NULL THEN
+        INSERT INTO week_cycles (start_date, end_date, status)
+        VALUES (week_start, week_end, 'open')
+        RETURNING id INTO current_cycle_id;
+    END IF;
+
+    RETURN current_cycle_id;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Sample products (remove in production)
 -- INSERT INTO products (name, description, price, image_url, stock) VALUES

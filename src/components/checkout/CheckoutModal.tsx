@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown } from 'lucide-react'
+import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock } from 'lucide-react'
 import clsx from 'clsx'
+import { OrderItem } from '@/types/database.types'
 
 interface CheckoutModalProps {
   isOpen: boolean
@@ -52,6 +53,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       currency: 'CRC',
     }).format(price)
   }
+
+  // Separate items into in_stock and pre_order
+  const inStockItems = state.items.filter(item => item.product.stock > 0)
+  const preOrderItems = state.items.filter(item => item.product.stock === 0)
 
   const validatePhone = (phone: string, countryCode: string) => {
     const country = countries.find(c => c.code === countryCode)
@@ -106,15 +111,19 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       const cleanPhone = formData.phone.replace(/\D/g, '')
       const fullPhone = selectedCountry.prefix ? `${selectedCountry.prefix} ${cleanPhone}` : cleanPhone
 
+      // Build order items with proper type based on stock
+      const orderItems: OrderItem[] = state.items.map((item) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        price: item.product.price,
+        quantity: item.quantity,
+        type: item.product.stock > 0 ? 'in_stock' : 'pre_order' as const
+      }))
+
       const orderData = {
         customer_name: formData.customer_name.trim(),
         phone: fullPhone,
-        items: state.items.map((item) => ({
-          product_id: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-        })),
+        items: orderItems,
         total: totalPrice,
       }
 
@@ -200,11 +209,21 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
             {/* Order Summary */}
             <div className="px-4 sm:px-6 py-3 bg-gray-50 border-b border-gray-100">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>Productos ({totalItems})</span>
-                <span>{formatPrice(totalPrice)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-gray-900">
+              {/* In-stock items */}
+              {inStockItems.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                  <Package className="w-4 h-4 text-green-600" />
+                  <span>Disponibles ({inStockItems.reduce((sum, i) => sum + i.quantity, 0)})</span>
+                </div>
+              )}
+              {/* Pre-order items */}
+              {preOrderItems.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-amber-600 mb-1">
+                  <Clock className="w-4 h-4" />
+                  <span>Pre-pedido ({preOrderItems.reduce((sum, i) => sum + i.quantity, 0)}) ~1.5 semanas</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-gray-900 mt-2">
                 <span>Total a pagar</span>
                 <span className="text-indigo-600">{formatPrice(totalPrice)}</span>
               </div>

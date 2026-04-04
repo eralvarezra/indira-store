@@ -2,7 +2,7 @@
 
 import { Product } from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
-import { ShoppingCart, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Clock } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
 import { ProductDetailModal } from './ProductDetailModal'
@@ -69,18 +69,26 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
 
-          {/* Stock Badge */}
+          {/* Pre-order Badge for out of stock */}
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium">
-                Agotado
-              </span>
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1">
+                <Clock className="w-4 h-4" />
+                Pre-pedido
+              </div>
             </div>
           )}
 
           {/* Quantity Badge */}
           {quantity > 0 && !isOutOfStock && (
             <div className="absolute top-2 right-2 bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+              {quantity}
+            </div>
+          )}
+
+          {/* Pre-order quantity badge */}
+          {quantity > 0 && isOutOfStock && (
+            <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
               {quantity}
             </div>
           )}
@@ -113,6 +121,13 @@ export function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
+          {/* Stock status message for out of stock */}
+          {isOutOfStock && (
+            <p className="text-xs text-amber-600 mb-2">
+              Entrega en ~1.5 semanas
+            </p>
+          )}
+
           {/* Add to cart / Quantity controls */}
           {quantity > 0 ? (
             <div
@@ -134,8 +149,12 @@ export function ProductCard({ product }: ProductCardProps) {
                   e.stopPropagation()
                   addItem(product)
                 }}
-                disabled={isOutOfStock || quantity >= product.stock}
-                className="w-9 h-9 rounded-full bg-indigo-600 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
+                className={clsx(
+                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors touch-target",
+                  isOutOfStock
+                    ? "bg-amber-500 active:bg-amber-600"
+                    : "bg-indigo-600 active:bg-indigo-700"
+                )}
               >
                 <Plus className="w-4 h-4 text-white" />
               </button>
@@ -143,16 +162,15 @@ export function ProductCard({ product }: ProductCardProps) {
           ) : (
             <button
               onClick={handleAdd}
-              disabled={isOutOfStock}
               className={clsx(
                 'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
                 isOutOfStock
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  ? 'bg-amber-500 text-white active:bg-amber-600 active:scale-95'
                   : 'bg-indigo-600 text-white active:bg-indigo-700 active:scale-95',
                 isAdding && 'scale-105'
               )}
             >
-              {isOutOfStock ? 'Agotado' : 'Agregar'}
+              {isOutOfStock ? 'Pre-pedido' : 'Agregar'}
             </button>
           )}
         </div>

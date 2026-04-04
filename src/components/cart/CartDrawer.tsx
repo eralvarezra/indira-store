@@ -1,7 +1,7 @@
 'use client'
 
 import { useCart } from '@/context/CartContext'
-import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react'
+import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package } from 'lucide-react'
 import clsx from 'clsx'
 
 interface CartDrawerProps {
@@ -18,6 +18,10 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
       currency: 'CRC',
     }).format(price)
   }
+
+  // Separate items into in_stock and pre_order
+  const inStockItems = state.items.filter(item => item.product.stock > 0)
+  const preOrderItems = state.items.filter(item => item.product.stock === 0)
 
   return (
     <>
@@ -72,69 +76,158 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
             <>
               {/* Items List */}
               <div className="flex-1 overflow-y-auto px-4 py-4 scroll-container">
-                <div className="space-y-3">
-                  {state.items.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex gap-3 bg-gray-50 rounded-xl p-3"
-                    >
-                      {/* Image */}
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                        {item.product.image_url ? (
-                          <img
-                            src={item.product.image_url}
-                            alt={item.product.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ShoppingBag className="w-6 h-6 text-gray-300" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Details */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 text-sm line-clamp-1">
-                          {item.product.name}
-                        </h3>
-                        <p className="text-indigo-600 font-semibold text-sm mt-0.5">
-                          {formatPrice(item.product.price)}
-                        </p>
-
-                        {/* Quantity Controls */}
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                              className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors touch-target"
-                            >
-                              <Minus className="w-3.5 h-3.5 text-gray-600" />
-                            </button>
-                            <span className="w-7 text-center text-sm font-medium">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                              disabled={item.quantity >= item.product.stock}
-                              className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
-                            >
-                              <Plus className="w-3.5 h-3.5 text-gray-600" />
-                            </button>
-                          </div>
-
-                          <button
-                            onClick={() => removeItem(item.product.id)}
-                            className="p-2 text-gray-400 active:text-red-500 active:bg-red-50 rounded-full transition-colors touch-target"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
+                {/* In-stock items */}
+                {inStockItems.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <Package className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-700">Disponibles</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-3">
+                      {inStockItems.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="flex gap-3 bg-gray-50 rounded-xl p-3"
+                        >
+                          {/* Image */}
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            {item.product.image_url ? (
+                              <img
+                                src={item.product.image_url}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ShoppingBag className="w-6 h-6 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900 text-sm line-clamp-1">
+                              {item.product.name}
+                            </h3>
+                            <p className="text-indigo-600 font-semibold text-sm mt-0.5">
+                              {formatPrice(item.product.price)}
+                            </p>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors touch-target"
+                                >
+                                  <Minus className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                                <span className="w-7 text-center text-sm font-medium">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                  disabled={item.quantity >= item.product.stock}
+                                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => removeItem(item.product.id)}
+                                className="p-2 text-gray-400 active:text-red-500 active:bg-red-50 rounded-full transition-colors touch-target"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pre-order items */}
+                {preOrderItems.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-700">Pre-pedido (~1.5 semanas)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {preOrderItems.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="flex gap-3 bg-amber-50 rounded-xl p-3 border border-amber-200"
+                        >
+                          {/* Image */}
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                            {item.product.image_url ? (
+                              <img
+                                src={item.product.image_url}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ShoppingBag className="w-6 h-6 text-gray-300" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                                Pre-pedido
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900 text-sm line-clamp-1">
+                              {item.product.name}
+                            </h3>
+                            <p className="text-indigo-600 font-semibold text-sm mt-0.5">
+                              {formatPrice(item.product.price)}
+                            </p>
+                            <p className="text-amber-600 text-xs mt-1">
+                              Entrega en ~1.5 semanas
+                            </p>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                  className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center active:bg-amber-100 transition-colors touch-target"
+                                >
+                                  <Minus className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                                <span className="w-7 text-center text-sm font-medium">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                  className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center active:bg-amber-100 transition-colors touch-target"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-gray-600" />
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => removeItem(item.product.id)}
+                                className="p-2 text-gray-400 active:text-red-500 active:bg-red-50 rounded-full transition-colors touch-target"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
