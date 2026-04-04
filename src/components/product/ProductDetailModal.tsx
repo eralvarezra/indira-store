@@ -53,7 +53,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden animate-in fade-in slide-up duration-200">
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] flex flex-col animate-in fade-in slide-up duration-200">
         {/* Drag handle for mobile */}
         <div className="flex justify-center pt-3 sm:hidden">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
@@ -106,7 +106,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto scroll-container" style={{ maxHeight: 'calc(90vh - 300px)' }}>
+        <div className="flex-1 overflow-y-auto p-4 scroll-container">
           {/* Name and Price */}
           <div className="flex items-start justify-between gap-4 mb-3">
             <h2 className="text-xl font-bold text-gray-900">
