@@ -264,6 +264,15 @@ export function updateWeekCycle(id: string, startDate: string, endDate: string):
   return weekCycles[index]
 }
 
+export function deleteWeekCycle(id: string): DemoWeekCycle | null {
+  const index = weekCycles.findIndex(c => c.id === id)
+  if (index === -1) return null
+
+  const deleted = weekCycles[index]
+  weekCycles.splice(index, 1)
+  return deleted
+}
+
 export function getOrdersByWeekCycle(weekCycleId: string): DemoOrder[] {
   return orders.filter(o => o.week_cycle_id === weekCycleId)
 }

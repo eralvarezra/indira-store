@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
-import { getWeekCycles, getCurrentWeekCycle, updateWeekCycle } from '@/lib/demo-store'
+import { getWeekCycles, getCurrentWeekCycle, updateWeekCycle, deleteWeekCycle } from '@/lib/demo-store'
 
 // GET - List all week cycles
 export async function GET() {
@@ -132,6 +132,48 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ cycle: updatedCycle })
   } catch (error) {
     console.error('Week cycle patch error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// DELETE - Delete a week cycle
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const cycleId = searchParams.get('id')
+
+    if (!cycleId) {
+      return NextResponse.json(
+        { error: 'Missing required parameter: id' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabase()
+
+    if (!supabase) {
+      // Demo mode
+      const deleted = deleteWeekCycle(cycleId)
+      if (deleted) {
+        return NextResponse.json({ success: true })
+      }
+      return NextResponse.json({ error: 'Cycle not found in demo mode' }, { status: 404 })
+    }
+
+    // Delete in Supabase
+    const { error } = await supabase
+      .from('week_cycles')
+      .delete()
+      .eq('id', cycleId)
+
+    if (error) {
+      console.error('Week cycle delete error:', error)
+      return NextResponse.json({ error: 'Failed to delete week cycle' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Week cycle delete error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

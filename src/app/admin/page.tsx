@@ -65,6 +65,7 @@ export default function AdminDashboard() {
   const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [showEditWeekModal, setShowEditWeekModal] = useState(false)
+  const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
   const [editWeekForm, setEditWeekForm] = useState({ startDate: '', endDate: '' })
 
   // Categories state
@@ -411,21 +412,21 @@ export default function AdminDashboard() {
     }
   }
 
-  const openEditWeekModal = () => {
-    const currentCycle = weekCycles.find(c => c.status === 'open')
-    if (!currentCycle) return
+  const openEditWeekModal = (cycleId: string) => {
+    const cycle = weekCycles.find(c => c.id === cycleId)
+    if (!cycle) return
 
     // Format dates for date input (YYYY-MM-DD)
-    const startDate = new Date(currentCycle.start_date).toISOString().slice(0, 10)
-    const endDate = new Date(currentCycle.end_date).toISOString().slice(0, 10)
+    const startDate = new Date(cycle.start_date).toISOString().slice(0, 10)
+    const endDate = new Date(cycle.end_date).toISOString().slice(0, 10)
 
+    setEditingCycleId(cycleId)
     setEditWeekForm({ startDate, endDate })
     setShowEditWeekModal(true)
   }
 
   const handleSaveEditWeek = async () => {
-    const currentCycle = weekCycles.find(c => c.status === 'open')
-    if (!currentCycle) return
+    if (!editingCycleId) return
 
     // Validate that start date is a Saturday
     const selectedDate = new Date(editWeekForm.startDate + 'T00:00:00')
@@ -447,7 +448,7 @@ export default function AdminDashboard() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cycleId: currentCycle.id,
+          cycleId: editingCycleId,
           startDate: startDateTime.toISOString(),
           endDate: endDateTime.toISOString(),
         }),
@@ -456,6 +457,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         await fetchData()
         setShowEditWeekModal(false)
+        setEditingCycleId(null)
         alert('Semana actualizada correctamente')
       } else {
         const errorData = await response.json()
@@ -464,6 +466,38 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error updating week cycle:', error)
       alert('Error al actualizar la semana')
+    } finally {
+      setIsLoadingReport(false)
+    }
+  }
+
+  const handleDeleteWeekCycle = async (cycleId: string) => {
+    const cycle = weekCycles.find(c => c.id === cycleId)
+    if (!cycle) return
+
+    if (cycle.status === 'open') {
+      alert('No puedes eliminar la semana activa')
+      return
+    }
+
+    if (!confirm('¿Estás seguro de eliminar esta semana? Esta acción no se puede deshacer.')) return
+
+    setIsLoadingReport(true)
+    try {
+      const response = await fetch(`/api/week-cycles?id=${cycleId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        await fetchData()
+        alert('Semana eliminada correctamente')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al eliminar la semana')
+      }
+    } catch (error) {
+      console.error('Error deleting week cycle:', error)
+      alert('Error al eliminar la semana')
     } finally {
       setIsLoadingReport(false)
     }
@@ -1105,7 +1139,7 @@ export default function AdminDashboard() {
                           Activa
                         </span>
                         <button
-                          onClick={openEditWeekModal}
+                          onClick={() => openEditWeekModal(weekCycles.find(c => c.status === 'open')!.id)}
                           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                           title="Editar fechas de la semana"
                         >
@@ -1207,9 +1241,22 @@ export default function AdminDashboard() {
                               {cycle.report_sent ? 'Reporte enviado' : 'Pendiente'}
                             </p>
                           </div>
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            Cerrada
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditWeekModal(cycle.id)}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Editar semana"
+                            >
+                              <Edit2 className="w-4 h-4 text-gray-600" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWeekCycle(cycle.id)}
+                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Eliminar semana"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1554,11 +1601,13 @@ export default function AdminDashboard() {
       {/* Edit Week Modal */}
       {showEditWeekModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowEditWeekModal(false)} />
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowEditWeekModal(false); setEditingCycleId(null); }} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Editar Semana Actual</h3>
-              <button onClick={() => setShowEditWeekModal(false)} className="p-1 hover:bg-gray-100 rounded-full">
+              <h3 className="text-lg font-bold">
+                {weekCycles.find(c => c.id === editingCycleId)?.status === 'open' ? 'Editar Semana Actual' : 'Editar Semana'}
+              </h3>
+              <button onClick={() => { setShowEditWeekModal(false); setEditingCycleId(null); }} className="p-1 hover:bg-gray-100 rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
