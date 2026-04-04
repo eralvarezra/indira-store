@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
     const filepath = path.join(uploadsDir, filename)
     await writeFile(filepath, buffer)
 
-    // Return public URL
-    const imageUrl = `/uploads/${filename}`
+    // Return API URL (Next.js standalone doesn't serve dynamic public files)
+    const imageUrl = `/api/uploads/${filename}`
 
     return NextResponse.json({
       success: true,
