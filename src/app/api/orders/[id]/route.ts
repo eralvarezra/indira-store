@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
-import { getOrders, updateOrder, updateProductStock, getProduct } from '@/lib/demo-store'
+import { getOrders, updateOrder, updateProductStock, getProduct, deleteOrder } from '@/lib/demo-store'
 
 interface OrderItem {
   product_id: string
@@ -172,5 +172,84 @@ async function handleStockChangeSupabase(
         .update({ stock: newStock } as never)
         .eq('id', item.product_id)
     }
+  }
+}
+
+// PUT - Edit order (customer_name, phone, items)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await request.json()
+    const { customer_name, phone, items, total } = body
+
+    if (!customer_name || !phone || !items) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const supabase = getSupabase()
+
+    if (!supabase) {
+      // Demo mode
+      const order = updateOrder(id, { customer_name, phone, items, total })
+      if (!order) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, order })
+    }
+
+    // Update in Supabase
+    const { data: order, error } = await supabase
+      .from('orders')
+      .update({ customer_name, phone, items, total } as never)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, order })
+  } catch (error) {
+    console.error('Order edit error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// DELETE - Delete order
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const supabase = getSupabase()
+
+    if (!supabase) {
+      // Demo mode
+      const deleted = deleteOrder(id)
+      if (!deleted) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    // Delete in Supabase
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Order delete error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

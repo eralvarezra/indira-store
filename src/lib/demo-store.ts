@@ -181,6 +181,14 @@ export function updateOrder(id: string, data: Partial<DemoOrder>): DemoOrder | n
   return orders[index]
 }
 
+export function deleteOrder(id: string): DemoOrder | null {
+  const index = orders.findIndex(o => o.id === id)
+  if (index === -1) return null
+  const deleted = orders[index]
+  orders.splice(index, 1)
+  return deleted
+}
+
 // Week Cycles CRUD
 export function getWeekCycles(): DemoWeekCycle[] {
   return weekCycles.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())

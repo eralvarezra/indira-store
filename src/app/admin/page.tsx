@@ -67,6 +67,12 @@ export default function AdminDashboard() {
   const [showEditWeekModal, setShowEditWeekModal] = useState(false)
   const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
   const [editWeekForm, setEditWeekForm] = useState({ startDate: '', endDate: '' })
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [orderForm, setOrderForm] = useState({ customer_name: '', phone: '' })
+  const [showEditWeekModal, setShowEditWeekModal] = useState(false)
+  const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
+  const [editWeekForm, setEditWeekForm] = useState({ startDate: '', endDate: '' })
 
   // Categories state
   const [categories, setCategories] = useState<Category[]>([])
@@ -503,6 +509,77 @@ export default function AdminDashboard() {
     }
   }
 
+  // Order management functions
+  const openEditOrderModal = (order: Order) => {
+    setEditingOrder(order)
+    setOrderForm({
+      customer_name: order.customer_name,
+      phone: order.phone,
+    })
+    setShowEditOrderModal(true)
+  }
+
+  const handleSaveOrder = async () => {
+    if (!editingOrder) return
+    if (!orderForm.customer_name.trim() || !orderForm.phone.trim()) {
+      alert('Nombre y teléfono son requeridos')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/orders/${editingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: orderForm.customer_name,
+          phone: orderForm.phone,
+          items: editingOrder.items,
+          total: editingOrder.total,
+        }),
+      })
+
+      if (response.ok) {
+        await fetchData()
+        setShowEditOrderModal(false)
+        setEditingOrder(null)
+        alert('Pedido actualizado correctamente')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al actualizar el pedido')
+      }
+    } catch (error) {
+      console.error('Error updating order:', error)
+      alert('Error al actualizar el pedido')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este pedido? Esta acción no se puede deshacer.')) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        await fetchData()
+        alert('Pedido eliminado correctamente')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al eliminar el pedido')
+      }
+    } catch (error) {
+      console.error('Error deleting order:', error)
+      alert('Error al eliminar el pedido')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Filter orders by week cycle
   const filteredOrders = selectedCycleId === 'all'
     ? orders
@@ -721,21 +798,39 @@ export default function AdminDashboard() {
                               <h3 className="font-semibold text-gray-900">{order.customer_name}</h3>
                               <p className="text-sm text-gray-500">{order.phone}</p>
                             </div>
-                            <div className="text-right">
-                              <span className={clsx(
-                                'px-3 py-1 rounded-full text-xs font-medium',
-                                order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
-                                order.status === 'confirmed' && 'bg-green-100 text-green-700',
-                                order.status === 'cancelled' && 'bg-red-100 text-red-700'
-                              )}>
-                                {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Confirmado' : 'Cancelado'}
-                              </span>
-                              {hasPreOrder && (
-                                <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                  Pre-pedido
+                            <div className="text-right flex items-start gap-2">
+                              <div>
+                                <span className={clsx(
+                                  'px-3 py-1 rounded-full text-xs font-medium',
+                                  order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
+                                  order.status === 'confirmed' && 'bg-green-100 text-green-700',
+                                  order.status === 'cancelled' && 'bg-red-100 text-red-700'
+                                )}>
+                                  {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Confirmado' : 'Cancelado'}
                                 </span>
-                              )}
-                              <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
+                                {hasPreOrder && (
+                                  <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    Pre-pedido
+                                  </span>
+                                )}
+                                <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => openEditOrderModal(order)}
+                                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                  title="Editar pedido"
+                                >
+                                  <Edit2 className="w-4 h-4 text-gray-500" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOrder(order.id)}
+                                  className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar pedido"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                           <div className="bg-gray-50 rounded-lg p-3">
@@ -1656,6 +1751,82 @@ export default function AdminDashboard() {
                 className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoadingReport ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Guardar Cambios
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal */}
+      {showEditOrderModal && editingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Editar Pedido</h3>
+              <button onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
+                <input
+                  type="text"
+                  value={orderForm.customer_name}
+                  onChange={(e) => setOrderForm({ ...orderForm, customer_name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="Nombre del cliente"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={orderForm.phone}
+                  onChange={(e) => setOrderForm({ ...orderForm, phone: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="Número de teléfono"
+                />
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Productos del Pedido</label>
+                <div className="space-y-2">
+                  {(editingOrder.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[]).map((item, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        {item.name} x{item.quantity}
+                        {item.type === 'pre_order' && (
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
+                            Pre-pedido
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
+                  <span>Total</span>
+                  <span className="text-[#E8775A]">{formatPrice(editingOrder.total)}</span>
+                </div>
+              </div>
+              <button
+                onClick={handleSaveOrder}
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Guardando...
