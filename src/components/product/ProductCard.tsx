@@ -95,18 +95,18 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.description}
           </p>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col">
               {hasDiscount ? (
                 <>
-                  <span className="text-xs sm:text-sm text-gray-400 line-through truncate">
+                  <span className="text-xs sm:text-sm text-gray-400 line-through">
                     {formatPrice(originalPrice)}
                   </span>
-                  <span className="text-base sm:text-lg font-bold text-indigo-600 truncate">
+                  <span className="text-base sm:text-lg font-bold text-indigo-600">
                     {formatPrice(discountedPrice)}
                   </span>
                 </>
               ) : (
-                <span className="text-base sm:text-lg font-bold text-indigo-600 truncate">
+                <span className="text-base sm:text-lg font-bold text-indigo-600">
                   {formatPrice(originalPrice)}
                 </span>
               )}
