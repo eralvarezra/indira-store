@@ -415,9 +415,9 @@ export default function AdminDashboard() {
     const currentCycle = weekCycles.find(c => c.status === 'open')
     if (!currentCycle) return
 
-    // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
-    const startDate = new Date(currentCycle.start_date).toISOString().slice(0, 16)
-    const endDate = new Date(currentCycle.end_date).toISOString().slice(0, 16)
+    // Format dates for date input (YYYY-MM-DD)
+    const startDate = new Date(currentCycle.start_date).toISOString().slice(0, 10)
+    const endDate = new Date(currentCycle.end_date).toISOString().slice(0, 10)
 
     setEditWeekForm({ startDate, endDate })
     setShowEditWeekModal(true)
@@ -427,15 +427,29 @@ export default function AdminDashboard() {
     const currentCycle = weekCycles.find(c => c.status === 'open')
     if (!currentCycle) return
 
+    // Validate that start date is a Saturday
+    const selectedDate = new Date(editWeekForm.startDate + 'T00:00:00')
+    if (selectedDate.getDay() !== 6) {
+      alert('La fecha de inicio debe ser un sábado')
+      return
+    }
+
     setIsLoadingReport(true)
     try {
+      // Start: Saturday 00:00:00
+      const startDateTime = new Date(editWeekForm.startDate + 'T00:00:00')
+      // End: Friday 23:59:59 (6 days after Saturday)
+      const endDateTime = new Date(editWeekForm.startDate + 'T00:00:00')
+      endDateTime.setDate(endDateTime.getDate() + 6)
+      endDateTime.setHours(23, 59, 59, 999)
+
       const response = await fetch('/api/week-cycles', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cycleId: currentCycle.id,
-          startDate: new Date(editWeekForm.startDate).toISOString(),
-          endDate: new Date(editWeekForm.endDate).toISOString(),
+          startDate: startDateTime.toISOString(),
+          endDate: endDateTime.toISOString(),
         }),
       })
 
@@ -1550,22 +1564,42 @@ export default function AdminDashboard() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha de Inicio (Sábado)
+                </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   value={editWeekForm.startDate}
-                  onChange={(e) => setEditWeekForm({ ...editWeekForm, startDate: e.target.value })}
+                  onChange={(e) => {
+                    const selectedDate = new Date(e.target.value + 'T00:00:00')
+                    const dayOfWeek = selectedDate.getDay()
+                    // Saturday = 6
+                    if (dayOfWeek !== 6) {
+                      alert('Solo puedes seleccionar sábados como fecha de inicio')
+                      return
+                    }
+                    const endDate = new Date(selectedDate)
+                    endDate.setDate(selectedDate.getDate() + 6)
+                    endDate.setHours(23, 59, 59, 999)
+                    setEditWeekForm({
+                      startDate: e.target.value,
+                      endDate: endDate.toISOString().slice(0, 10)
+                    })
+                  }}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                 />
+                <p className="text-xs text-gray-500 mt-1">La semana inicia el sábado a las 12:00 AM</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin</label>
-                <input
-                  type="datetime-local"
-                  value={editWeekForm.endDate}
-                  onChange={(e) => setEditWeekForm({ ...editWeekForm, endDate: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin (Viernes)</label>
+                <div className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-700">
+                  {editWeekForm.endDate ? new Date(editWeekForm.endDate + 'T23:59:59').toLocaleDateString('es-CR', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  }) : '-'}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">La semana termina el viernes a las 11:59 PM</p>
               </div>
               <button
                 onClick={handleSaveEditWeek}
