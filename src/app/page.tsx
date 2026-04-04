@@ -1,65 +1,133 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect } from 'react'
+import { CartProvider } from '@/context/CartContext'
+import { ProductCard } from '@/components/product/ProductCard'
+import { CartDrawer } from '@/components/cart/CartDrawer'
+import { FloatingCartButton } from '@/components/cart/FloatingCartButton'
+import { CheckoutModal } from '@/components/checkout/CheckoutModal'
+import { Product } from '@/types/database.types'
+import { ShoppingBag, Loader2, Search } from 'lucide-react'
+
+function CatalogContent() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('/api/products')
+      const data = await response.json()
+      setProducts(data.products || [])
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">
+              <span className="text-indigo-600">Indira</span> Store
+            </h1>
+            <div className="flex items-center gap-2">
+              <a
+                href="/admin/login"
+                className="text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+              >
+                Admin
+              </a>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar productos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none transition-colors"
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6 pb-24">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+            <p className="mt-4 text-gray-500">Cargando productos...</p>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <ShoppingBag className="w-12 h-12 text-gray-300" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Sin productos</h2>
+            <p className="text-gray-500 text-center">
+              Los productos aparecerán aquí cuando estén disponibles.
+            </p>
+          </div>
+        ) : (
+          <>
+            {searchQuery && filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <p className="text-gray-500">No se encontraron productos para "{searchQuery}"</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mb-4">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'producto' : 'productos'}
+                </p>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {filteredProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Floating Cart Button */}
+      <FloatingCartButton />
+
+      {/* Cart Drawer */}
+      <CartDrawer onCheckout={() => setIsCheckoutOpen(true)} />
+
+      {/* Checkout Modal */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+      />
+    </div>
+  )
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <CartProvider>
+      <CatalogContent />
+    </CartProvider>
+  )
 }

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes)",
+      "Bash(npx create-next-app@latest indira-store --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes)",
+      "Bash(mv indira-store/* .)",
+      "Bash(mv indira-store/.* .)",
+      "Bash(rm -rf indira-store)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(taskkill /f /im node.exe)",
+      "Bash(curl -s http://localhost:3000/api/products)",
+      "Bash(curl:*)"
+    ]
+  }
+}
