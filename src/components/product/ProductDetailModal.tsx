@@ -4,7 +4,7 @@ import { Product, SKINCARE_CATEGORIES, getCategoryInfo } from '@/types/database.
 import { useCart } from '@/context/CartContext'
 import { X, Plus, Minus, ShoppingCart } from 'lucide-react'
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 interface ProductDetailModalProps {
   product: Product
@@ -15,6 +15,8 @@ interface ProductDetailModalProps {
 export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
   const { addItem, state, updateQuantity } = useCart()
   const [isAdding, setIsAdding] = useState(false)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
 
   const cartItem = state.items.find((item) => item.product.id === product.id)
   const quantity = cartItem?.quantity || 0
@@ -42,6 +44,25 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const productWithCategory = product as Product & { category?: string }
   const categoryInfo = productWithCategory.category ? getCategoryInfo(productWithCategory.category) : null
 
+  // Handle swipe to close on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientY)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return
+    const touchY = e.touches[0].clientY
+    const diff = touchY - touchStart
+    if (diff > 100 && modalRef.current) {
+      onClose()
+      setTouchStart(null)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    setTouchStart(null)
+  }
+
   if (!isOpen) return null
 
   return (
@@ -53,18 +74,27 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] flex flex-col animate-in fade-in slide-up duration-200">
-        {/* Drag handle for mobile */}
-        <div className="flex justify-center pt-3 sm:hidden">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+      <div
+        ref={modalRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="relative bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] flex flex-col animate-in fade-in slide-up duration-300"
+      >
+        {/* Drag handle for mobile - larger touch area */}
+        <div
+          className="flex justify-center pt-3 pb-2 sm:hidden cursor-grab active:cursor-grabbing"
+          onClick={onClose}
+        >
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </div>
 
-        {/* Close button */}
+        {/* Close button - larger and more visible */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full z-10 touch-target"
+          className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full z-10 shadow-sm hover:bg-gray-100 active:bg-gray-200 transition-colors"
         >
-          <X className="w-5 h-5 text-gray-600" />
+          <X className="w-6 h-6 text-gray-700" />
         </button>
 
         {/* Image */}
@@ -162,22 +192,22 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
         </div>
 
         {/* Footer with Add to Cart */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 safe-bottom">
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 sm:p-5 safe-bottom">
           {quantity > 0 ? (
             <div className="flex items-center justify-center gap-4">
               <button
                 onClick={() => updateQuantity(product.id, quantity - 1)}
-                className="w-12 h-12 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors touch-target"
+                className="w-14 h-14 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center transition-colors touch-target"
               >
-                <Minus className="w-5 h-5 text-gray-600" />
+                <Minus className="w-6 h-6 text-gray-700" />
               </button>
-              <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
+              <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
               <button
                 onClick={() => addItem(product)}
                 disabled={isOutOfStock || quantity >= product.stock}
-                className="w-12 h-12 rounded-full bg-indigo-600 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
+                className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
               >
-                <Plus className="w-5 h-5 text-white" />
+                <Plus className="w-6 h-6 text-white" />
               </button>
             </div>
           ) : (
@@ -185,11 +215,11 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               onClick={handleAdd}
               disabled={isOutOfStock}
               className={clsx(
-                'w-full py-4 rounded-xl font-semibold text-white transition-all touch-target text-base',
+                'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target',
                 isOutOfStock
                   ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-indigo-600 active:bg-indigo-700',
-                isAdding && 'scale-105'
+                  : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700',
+                isAdding && 'scale-[1.02]'
               )}
             >
               {isOutOfStock ? 'Producto Agotado' : 'Agregar al Carrito'}
