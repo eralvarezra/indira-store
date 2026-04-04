@@ -55,7 +55,7 @@ function CatalogContent() {
               <img
                 src="/logo.png"
                 alt="Indira Store"
-                className="h-10 w-auto"
+                className="h-14 w-auto"
               />
             </a>
             <a
