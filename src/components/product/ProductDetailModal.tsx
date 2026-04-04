@@ -71,97 +71,100 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
           </div>
         </div>
 
-        {/* Image */}
-        <div className="relative aspect-square sm:aspect-video bg-gray-100 -mt-2">
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-              <ShoppingCart className="w-16 h-16 text-gray-300" />
-            </div>
-          )}
+        {/* Scrollable content - Image + Details */}
+        <div className="flex-1 overflow-y-auto scroll-container">
+          {/* Image */}
+          <div className="relative aspect-square sm:aspect-video bg-gray-100">
+            {product.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                <ShoppingCart className="w-16 h-16 text-gray-300" />
+              </div>
+            )}
 
-          {/* Discount Badge */}
-          {hasDiscount && !isOutOfStock && (
-            <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg">
-              -{discountPercentage}%
-            </div>
-          )}
+            {/* Discount Badge */}
+            {hasDiscount && !isOutOfStock && (
+              <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg">
+                -{discountPercentage}%
+              </div>
+            )}
 
-          {/* Category Badge */}
-          {categoryInfo && (
-            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full text-xs font-medium shadow">
-              {categoryInfo.icon} {categoryInfo.name}
-            </div>
-          )}
+            {/* Category Badge */}
+            {categoryInfo && (
+              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full text-xs font-medium shadow">
+                {categoryInfo.icon} {categoryInfo.name}
+              </div>
+            )}
 
-          {/* Stock Badge */}
-          {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="bg-red-500 text-white px-4 py-2 rounded-full font-medium">
-                Agotado
-              </span>
-            </div>
-          )}
-        </div>
+            {/* Stock Badge */}
+            {isOutOfStock && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="bg-red-500 text-white px-4 py-2 rounded-full font-medium">
+                  Agotado
+                </span>
+              </div>
+            )}
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 scroll-container">
-          {/* Name and Price */}
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <h2 className="text-xl font-bold text-gray-900">
-              {product.name}
-            </h2>
-            <div className="text-right flex-shrink-0">
-              {hasDiscount ? (
-                <>
-                  <span className="text-sm text-gray-400 line-through block">
+          {/* Content */}
+          <div className="p-4">
+            {/* Name and Price */}
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <h2 className="text-xl font-bold text-gray-900">
+                {product.name}
+              </h2>
+              <div className="text-right flex-shrink-0">
+                {hasDiscount ? (
+                  <>
+                    <span className="text-sm text-gray-400 line-through block">
+                      {formatPrice(originalPrice)}
+                    </span>
+                    <span className="text-xl font-bold text-indigo-600">
+                      {formatPrice(discountedPrice)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xl font-bold text-indigo-600">
                     {formatPrice(originalPrice)}
                   </span>
-                  <span className="text-xl font-bold text-indigo-600">
-                    {formatPrice(discountedPrice)}
-                  </span>
-                </>
-              ) : (
-                <span className="text-xl font-bold text-indigo-600">
-                  {formatPrice(originalPrice)}
-                </span>
-              )}
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Description */}
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-1">Descripción</h3>
-            <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
-              {product.description || 'Sin descripción'}
-            </p>
-          </div>
+            {/* Description */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-1">Descripción</h3>
+              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                {product.description || 'Sin descripción'}
+              </p>
+            </div>
 
-          {/* Category */}
-          {categoryInfo && (
-            <div className="mb-3">
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700">
-                {categoryInfo.icon} {categoryInfo.name}
+            {/* Category */}
+            {categoryInfo && (
+              <div className="mb-3">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700">
+                  {categoryInfo.icon} {categoryInfo.name}
+                </span>
+              </div>
+            )}
+
+            {/* Stock info */}
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                product.stock > 10
+                  ? 'bg-green-100 text-green-700'
+                  : product.stock > 0
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+              }`}>
+                {isOutOfStock ? 'Sin stock' : `${product.stock} disponibles`}
               </span>
             </div>
-          )}
-
-          {/* Stock info */}
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-              product.stock > 10
-                ? 'bg-green-100 text-green-700'
-                : product.stock > 0
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
-            }`}>
-              {isOutOfStock ? 'Sin stock' : `${product.stock} disponibles`}
-            </span>
           </div>
         </div>
 
