@@ -30,10 +30,10 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
         onClick={closeCart}
       />
 
-      {/* Drawer - Full width on mobile */}
+      {/* Drawer - Full width on mobile, side panel on desktop */}
       <div
         className={clsx(
-          'fixed inset-0 sm:inset-y-0 sm:right-0 sm:w-full sm:max-w-md bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-out',
+          'fixed inset-y-0 right-0 sm:right-0 sm:w-full sm:max-w-md bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-out',
           state.isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
