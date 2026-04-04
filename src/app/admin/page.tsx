@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => {
                       setEditingProduct(null)
-                      setProductForm({ name: '', description: '', price: '', image_url: '', stock: '' })
+                      setProductForm({ name: '', description: '', price: '', image_url: '', stock: '', category: '' })
                       setImagePreview(null)
                       setShowProductModal(true)
                     }}
