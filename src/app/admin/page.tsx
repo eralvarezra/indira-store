@@ -64,6 +64,8 @@ export default function AdminDashboard() {
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [showEditWeekModal, setShowEditWeekModal] = useState(false)
+  const [editWeekForm, setEditWeekForm] = useState({ startDate: '', endDate: '' })
 
   // Categories state
   const [categories, setCategories] = useState<Category[]>([])
@@ -406,6 +408,50 @@ export default function AdminDashboard() {
       alert('Error al descargar el reporte')
     } finally {
       setIsDownloading(false)
+    }
+  }
+
+  const openEditWeekModal = () => {
+    const currentCycle = weekCycles.find(c => c.status === 'open')
+    if (!currentCycle) return
+
+    // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
+    const startDate = new Date(currentCycle.start_date).toISOString().slice(0, 16)
+    const endDate = new Date(currentCycle.end_date).toISOString().slice(0, 16)
+
+    setEditWeekForm({ startDate, endDate })
+    setShowEditWeekModal(true)
+  }
+
+  const handleSaveEditWeek = async () => {
+    const currentCycle = weekCycles.find(c => c.status === 'open')
+    if (!currentCycle) return
+
+    setIsLoadingReport(true)
+    try {
+      const response = await fetch('/api/week-cycles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cycleId: currentCycle.id,
+          startDate: new Date(editWeekForm.startDate).toISOString(),
+          endDate: new Date(editWeekForm.endDate).toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        await fetchData()
+        setShowEditWeekModal(false)
+        alert('Semana actualizada correctamente')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al actualizar la semana')
+      }
+    } catch (error) {
+      console.error('Error updating week cycle:', error)
+      alert('Error al actualizar la semana')
+    } finally {
+      setIsLoadingReport(false)
     }
   }
 
@@ -1044,6 +1090,13 @@ export default function AdminDashboard() {
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                           Activa
                         </span>
+                        <button
+                          onClick={openEditWeekModal}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Editar fechas de la semana"
+                        >
+                          <Edit2 className="w-4 h-4 text-gray-600" />
+                        </button>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-100">
@@ -1478,6 +1531,58 @@ export default function AdminDashboard() {
                 className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors"
               >
                 {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Week Modal */}
+      {showEditWeekModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowEditWeekModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Editar Semana Actual</h3>
+              <button onClick={() => setShowEditWeekModal(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+                <input
+                  type="datetime-local"
+                  value={editWeekForm.startDate}
+                  onChange={(e) => setEditWeekForm({ ...editWeekForm, startDate: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin</label>
+                <input
+                  type="datetime-local"
+                  value={editWeekForm.endDate}
+                  onChange={(e) => setEditWeekForm({ ...editWeekForm, endDate: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                />
+              </div>
+              <button
+                onClick={handleSaveEditWeek}
+                disabled={isLoadingReport}
+                className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoadingReport ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Guardar Cambios
+                  </>
+                )}
               </button>
             </div>
           </div>

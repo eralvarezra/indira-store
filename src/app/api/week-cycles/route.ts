@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
-import { getWeekCycles, getCurrentWeekCycle } from '@/lib/demo-store'
+import { getWeekCycles, getCurrentWeekCycle, updateWeekCycle } from '@/lib/demo-store'
 
 // GET - List all week cycles
 export async function GET() {
@@ -85,6 +85,53 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ cycle: newCycle })
   } catch (error) {
     console.error('Week cycle error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// PATCH - Update week cycle dates
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { cycleId, startDate, endDate } = body
+
+    if (!cycleId || !startDate || !endDate) {
+      return NextResponse.json(
+        { error: 'Missing required fields: cycleId, startDate, endDate' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabase()
+
+    if (!supabase) {
+      // Demo mode
+      const updated = updateWeekCycle(cycleId, startDate, endDate)
+      if (updated) {
+        return NextResponse.json({ cycle: updated })
+      }
+      return NextResponse.json({ error: 'Cycle not found in demo mode' }, { status: 404 })
+    }
+
+    // Update in Supabase
+    const { data: updatedCycle, error } = await supabase
+      .from('week_cycles')
+      .update({
+        start_date: startDate,
+        end_date: endDate,
+      } as never)
+      .eq('id', cycleId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Week cycle update error:', error)
+      return NextResponse.json({ error: 'Failed to update week cycle' }, { status: 500 })
+    }
+
+    return NextResponse.json({ cycle: updatedCycle })
+  } catch (error) {
+    console.error('Week cycle patch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
