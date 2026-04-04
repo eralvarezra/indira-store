@@ -94,66 +94,67 @@ export function ProductCard({ product }: ProductCardProps) {
           <p className="text-gray-500 text-xs sm:text-sm mb-2 line-clamp-2 min-h-[2rem]">
             {product.description}
           </p>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-col">
-              {hasDiscount ? (
-                <>
-                  <span className="text-xs sm:text-sm text-gray-400 line-through">
-                    {formatPrice(originalPrice)}
-                  </span>
-                  <span className="text-base sm:text-lg font-bold text-indigo-600">
-                    {formatPrice(discountedPrice)}
-                  </span>
-                </>
-              ) : (
-                <span className="text-base sm:text-lg font-bold text-indigo-600">
+
+          {/* Price */}
+          <div className="mb-2">
+            {hasDiscount ? (
+              <>
+                <span className="text-xs sm:text-sm text-gray-400 line-through">
                   {formatPrice(originalPrice)}
                 </span>
-              )}
-            </div>
-
-            {quantity > 0 ? (
-              <div
-                className="flex items-center gap-1.5 flex-shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    updateQuantity(product.id, quantity - 1)
-                  }}
-                  className="w-9 h-9 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors touch-target"
-                >
-                  <Minus className="w-4 h-4 text-gray-600" />
-                </button>
-                <span className="w-7 text-center font-semibold text-sm">{quantity}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    addItem(product)
-                  }}
-                  disabled={isOutOfStock || quantity >= product.stock}
-                  className="w-9 h-9 rounded-full bg-indigo-600 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
-                >
-                  <Plus className="w-4 h-4 text-white" />
-                </button>
-              </div>
+                <span className="text-base sm:text-lg font-bold text-indigo-600 ml-2">
+                  {formatPrice(discountedPrice)}
+                </span>
+              </>
             ) : (
-              <button
-                onClick={handleAdd}
-                disabled={isOutOfStock}
-                className={clsx(
-                  'px-3 py-2 rounded-full font-medium text-xs sm:text-sm transition-all duration-200 touch-target',
-                  isOutOfStock
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white active:bg-indigo-700 active:scale-95',
-                  isAdding && 'scale-110'
-                )}
-              >
-                {isOutOfStock ? 'Agotado' : 'Agregar'}
-              </button>
+              <span className="text-base sm:text-lg font-bold text-indigo-600">
+                {formatPrice(originalPrice)}
+              </span>
             )}
           </div>
+
+          {/* Add to cart / Quantity controls */}
+          {quantity > 0 ? (
+            <div
+              className="flex items-center justify-center gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  updateQuantity(product.id, quantity - 1)
+                }}
+                className="w-9 h-9 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors touch-target"
+              >
+                <Minus className="w-4 h-4 text-gray-600" />
+              </button>
+              <span className="w-8 text-center font-semibold">{quantity}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  addItem(product)
+                }}
+                disabled={isOutOfStock || quantity >= product.stock}
+                className="w-9 h-9 rounded-full bg-indigo-600 active:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-target"
+              >
+                <Plus className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleAdd}
+              disabled={isOutOfStock}
+              className={clsx(
+                'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
+                isOutOfStock
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 text-white active:bg-indigo-700 active:scale-95',
+                isAdding && 'scale-105'
+              )}
+            >
+              {isOutOfStock ? 'Agotado' : 'Agregar'}
+            </button>
+          )}
         </div>
       </div>
 
