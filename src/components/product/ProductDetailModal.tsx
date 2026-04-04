@@ -4,7 +4,7 @@ import { Product, SKINCARE_CATEGORIES, getCategoryInfo } from '@/types/database.
 import { useCart } from '@/context/CartContext'
 import { X, Plus, Minus, ShoppingCart } from 'lucide-react'
 import clsx from 'clsx'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 
 interface ProductDetailModalProps {
   product: Product
@@ -15,8 +15,6 @@ interface ProductDetailModalProps {
 export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
   const { addItem, state, updateQuantity } = useCart()
   const [isAdding, setIsAdding] = useState(false)
-  const modalRef = useRef<HTMLDivElement>(null)
-  const [touchStart, setTouchStart] = useState<number | null>(null)
 
   const cartItem = state.items.find((item) => item.product.id === product.id)
   const quantity = cartItem?.quantity || 0
@@ -44,25 +42,6 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const productWithCategory = product as Product & { category?: string }
   const categoryInfo = productWithCategory.category ? getCategoryInfo(productWithCategory.category) : null
 
-  // Handle swipe to close on mobile
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.touches[0].clientY)
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStart === null) return
-    const touchY = e.touches[0].clientY
-    const diff = touchY - touchStart
-    if (diff > 100 && modalRef.current) {
-      onClose()
-      setTouchStart(null)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    setTouchStart(null)
-  }
-
   if (!isOpen) return null
 
   return (
@@ -74,31 +53,26 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       />
 
       {/* Modal */}
-      <div
-        ref={modalRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className="relative bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] flex flex-col animate-in fade-in slide-up duration-300"
-      >
-        {/* Drag handle for mobile - larger touch area */}
-        <div
-          className="flex justify-center pt-3 pb-2 sm:hidden cursor-grab active:cursor-grabbing"
-          onClick={onClose}
-        >
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+      <div className="relative bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] flex flex-col animate-in fade-in slide-up duration-300">
+        {/* Header with close button - always visible */}
+        <div className="sticky top-0 z-20 bg-white rounded-t-3xl sm:rounded-t-2xl">
+          {/* Close button - prominent and easy to tap */}
+          <div className="flex justify-between items-center p-3">
+            <div className="w-10" /> {/* Spacer */}
+            <div className="flex justify-center">
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+            </div>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-700" />
+            </button>
+          </div>
         </div>
 
-        {/* Close button - larger and more visible */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full z-10 shadow-sm hover:bg-gray-100 active:bg-gray-200 transition-colors"
-        >
-          <X className="w-6 h-6 text-gray-700" />
-        </button>
-
         {/* Image */}
-        <div className="relative aspect-square sm:aspect-video bg-gray-100">
+        <div className="relative aspect-square sm:aspect-video bg-gray-100 -mt-2">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -120,7 +94,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
           {/* Category Badge */}
           {categoryInfo && (
-            <div className="absolute top-3 right-14 bg-white/90 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full text-xs font-medium shadow">
+            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full text-xs font-medium shadow">
               {categoryInfo.icon} {categoryInfo.name}
             </div>
           )}
