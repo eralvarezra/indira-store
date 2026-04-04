@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock } from 'lucide-react'
+import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen } from 'lucide-react'
 import clsx from 'clsx'
-import { Product, Order, SKINCARE_CATEGORIES, CategoryId } from '@/types/database.types'
+import { Product, Order, Category } from '@/types/database.types'
 
-type Tab = 'products' | 'orders' | 'promos' | 'reports' | 'settings'
+type Tab = 'products' | 'orders' | 'promos' | 'categories' | 'reports' | 'settings'
 
 interface WeekCycle {
   id: string
@@ -47,7 +47,7 @@ export default function AdminDashboard() {
     price: '',
     image_url: '',
     stock: '',
-    category: '' as CategoryId | '',
+    category: '',
   })
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -63,6 +63,19 @@ export default function AdminDashboard() {
   const [selectedCycleId, setSelectedCycleId] = useState<string>('all')
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  // Categories state
+  const [categories, setCategories] = useState<Category[]>([])
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    slug: '',
+    icon: '',
+    parent_id: '' as string | null,
+    sort_order: 0,
+  })
 
   useEffect(() => {
     checkAuth()
@@ -83,11 +96,12 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const [productsRes, ordersRes, settingsRes, cyclesRes] = await Promise.all([
+      const [productsRes, ordersRes, settingsRes, cyclesRes, categoriesRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/orders'),
         fetch('/api/admin/settings'),
         fetch('/api/week-cycles'),
+        fetch('/api/categories'),
       ])
 
       if (productsRes.ok) {
@@ -108,6 +122,11 @@ export default function AdminDashboard() {
       if (cyclesRes.ok) {
         const data = await cyclesRes.json()
         setWeekCycles(data.cycles || [])
+      }
+
+      if (categoriesRes.ok) {
+        const data = await categoriesRes.json()
+        setCategories(data.categories || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -325,7 +344,7 @@ export default function AdminDashboard() {
   const fetchWeeklyReport = async () => {
     setIsLoadingReport(true)
     try {
-      const response = await fetch('/api/cron/weekly-report')
+      const response = await fetch('/api/admin/weekly-report')
       if (response.ok) {
         const data = await response.json()
         setWeeklyReport(data.report)
@@ -342,10 +361,8 @@ export default function AdminDashboard() {
 
     setIsLoadingReport(true)
     try {
-      const cronSecret = process.env.NEXT_PUBLIC_CRON_SECRET
-      const response = await fetch('/api/cron/weekly-report', {
+      const response = await fetch('/api/admin/weekly-report', {
         method: 'POST',
-        headers: cronSecret ? { 'Authorization': `Bearer ${cronSecret}` } : {},
       })
 
       if (response.ok) {
@@ -354,13 +371,41 @@ export default function AdminDashboard() {
         fetchData()
         alert('Reporte semanal generado y enviado por Telegram')
       } else {
-        alert('Error al generar el reporte')
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al generar el reporte')
       }
     } catch (error) {
       console.error('Error generating report:', error)
       alert('Error al generar el reporte')
     } finally {
       setIsLoadingReport(false)
+    }
+  }
+
+  const handleDownloadExcel = async () => {
+    setIsDownloading(true)
+    try {
+      const url = selectedCycleId === 'all'
+        ? '/api/reports/excel'
+        : `/api/reports/excel?cycleId=${selectedCycleId}`
+
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Error downloading Excel')
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `reporte-indira-${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error downloading Excel:', error)
+      alert('Error al descargar el reporte')
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -377,7 +422,7 @@ export default function AdminDashboard() {
       price: product.price.toString(),
       image_url: product.image_url || '',
       stock: product.stock.toString(),
-      category: (product.category || '') as CategoryId | '',
+      category: product.category || '',
     })
     setImagePreview(product.image_url || null)
     setShowProductModal(true)
@@ -416,7 +461,7 @@ export default function AdminDashboard() {
             <img
               src="/logo.png"
               alt="Indira Store"
-              className="h-8 w-auto"
+              className="h-12 w-auto"
             />
             <span className="text-sm font-medium text-gray-500">Admin</span>
           </a>
@@ -438,6 +483,7 @@ export default function AdminDashboard() {
               { id: 'products' as Tab, label: 'Productos', icon: Package },
               { id: 'orders' as Tab, label: 'Pedidos', icon: ShoppingBag },
               { id: 'promos' as Tab, label: 'Promos', icon: Tag },
+              { id: 'categories' as Tab, label: 'Categorías', icon: FolderOpen },
               { id: 'reports' as Tab, label: 'Reportes', icon: BarChart3 },
               { id: 'settings' as Tab, label: 'Config', icon: Settings },
             ].map((tab) => (
@@ -447,7 +493,7 @@ export default function AdminDashboard() {
                 className={clsx(
                   'flex items-center gap-1.5 px-3 py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm',
                   activeTab === tab.id
-                    ? 'text-indigo-600 border-indigo-600'
+                    ? 'text-[#E8775A] border-[#f6a07a]'
                     : 'text-gray-500 border-transparent active:text-gray-700'
                 )}
               >
@@ -463,7 +509,7 @@ export default function AdminDashboard() {
       <main className="px-3 py-4 pb-24">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-[#E8775A]" />
           </div>
         ) : (
           <>
@@ -479,7 +525,7 @@ export default function AdminDashboard() {
                       setImagePreview(null)
                       setShowProductModal(true)
                     }}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-2 bg-[#f6a07a] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                     Nuevo Producto
@@ -513,7 +559,7 @@ export default function AdminDashboard() {
                         <h3 className="font-semibold text-gray-900">{product.name}</h3>
                         <p className="text-sm text-gray-500 line-clamp-2 mt-1">{product.description}</p>
                         <div className="flex items-center justify-between mt-3">
-                          <span className="text-lg font-bold text-indigo-600">{formatPrice(product.price)}</span>
+                          <span className="text-lg font-bold text-[#E8775A]">{formatPrice(product.price)}</span>
                           <span className="text-sm text-gray-500">Stock: {product.stock}</span>
                         </div>
                         <div className="flex gap-2 mt-4">
@@ -556,7 +602,7 @@ export default function AdminDashboard() {
                     <select
                       value={selectedCycleId}
                       onChange={(e) => setSelectedCycleId(e.target.value)}
-                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-indigo-500 outline-none"
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
                     >
                       <option value="all">Todos los pedidos</option>
                       {weekCycles.map((cycle) => (
@@ -614,7 +660,7 @@ export default function AdminDashboard() {
                             ))}
                             <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
                               <span>Total</span>
-                              <span className="text-indigo-600">{formatPrice(order.total)}</span>
+                              <span className="text-[#E8775A]">{formatPrice(order.total)}</span>
                             </div>
                           </div>
 
@@ -700,7 +746,7 @@ export default function AdminDashboard() {
                           max="100"
                           value={bulkDiscount}
                           onChange={(e) => setBulkDiscount(e.target.value)}
-                          className="w-24 px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-indigo-500 outline-none text-center"
+                          className="w-24 px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-[#f6a07a] outline-none text-center"
                           placeholder="0"
                         />
                         <span className="text-gray-500">%</span>
@@ -713,7 +759,7 @@ export default function AdminDashboard() {
                         'px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2',
                         selectedProducts.length === 0 || isUpdatingDiscount
                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          : 'bg-[#f6a07a] text-white hover:bg-[#e58e6a]'
                       )}
                     >
                       {isUpdatingDiscount ? (
@@ -742,7 +788,7 @@ export default function AdminDashboard() {
                       type="checkbox"
                       checked={selectedProducts.length === products.length && products.length > 0}
                       onChange={handleSelectAllProducts}
-                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="w-5 h-5 rounded border-gray-300 text-[#E8775A] focus:ring-indigo-500"
                     />
                     <span className="text-sm font-medium text-gray-700">
                       Seleccionar todos ({products.length})
@@ -769,7 +815,7 @@ export default function AdminDashboard() {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => handleSelectProduct(product.id)}
-                            className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            className="w-5 h-5 rounded border-gray-300 text-[#E8775A] focus:ring-indigo-500"
                           />
                           <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                             {product.image_url ? (
@@ -789,11 +835,11 @@ export default function AdminDashboard() {
                             <p className="text-sm text-gray-500">Stock: {product.stock}</p>
                           </div>
                           <div className="text-right">
-                            <div className={clsx('font-bold', hasDiscount ? 'text-gray-400 line-through text-sm' : 'text-indigo-600')}>
+                            <div className={clsx('font-bold', hasDiscount ? 'text-gray-400 line-through text-sm' : 'text-[#E8775A]')}>
                               {formatPrice(product.price)}
                             </div>
                             {hasDiscount && (
-                              <div className="text-lg font-bold text-indigo-600">
+                              <div className="text-lg font-bold text-[#E8775A]">
                                 {formatPrice(product.price * (1 - discount / 100))}
                               </div>
                             )}
@@ -824,28 +870,156 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Categories Tab */}
+            {activeTab === 'categories' && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">Gestión de Categorías</h2>
+                  <button
+                    onClick={() => {
+                      setEditingCategory(null)
+                      setCategoryForm({ name: '', slug: '', icon: '', parent_id: null, sort_order: 0 })
+                      setShowCategoryModal(true)
+                    }}
+                    className="flex items-center gap-2 bg-[#f6a07a] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Nueva Categoría
+                  </button>
+                </div>
+
+                {/* Main Categories */}
+                <div className="space-y-4">
+                  {categories.map((category) => (
+                    <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{category.icon}</span>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                            <p className="text-sm text-gray-500">{category.subcategories?.length || 0} subcategorías</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingCategory(category)
+                              setCategoryForm({
+                                name: category.name,
+                                slug: category.slug,
+                                icon: category.icon || '',
+                                parent_id: null,
+                                sort_order: category.sort_order,
+                              })
+                              setShowCategoryModal(true)
+                            }}
+                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Subcategories */}
+                      {category.subcategories && category.subcategories.length > 0 && (
+                        <div className="border-t bg-gray-50 p-3 space-y-2">
+                          {category.subcategories.map((sub) => (
+                            <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <span>{sub.icon}</span>
+                                <span className="text-sm text-gray-700">{sub.name}</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setEditingCategory(sub)
+                                  setCategoryForm({
+                                    name: sub.name,
+                                    slug: sub.slug,
+                                    icon: sub.icon || '',
+                                    parent_id: sub.parent_id,
+                                    sort_order: sub.sort_order,
+                                  })
+                                  setShowCategoryModal(true)
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              setEditingCategory(null)
+                              setCategoryForm({
+                                name: '',
+                                slug: '',
+                                icon: '',
+                                parent_id: category.id,
+                                sort_order: (category.subcategories?.length || 0) + 1,
+                              })
+                              setShowCategoryModal(true)
+                            }}
+                            className="w-full py-2 text-sm text-[#f6a07a] hover:bg-[#f6a07a]/10 rounded-lg transition-colors flex items-center justify-center gap-1"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Agregar subcategoría
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {categories.length === 0 && (
+                  <div className="text-center py-12">
+                    <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay categorías. Crea la primera.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Reports Tab */}
             {activeTab === 'reports' && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold">Reporte Semanal</h2>
-                  <button
-                    onClick={() => fetchWeeklyReport()}
-                    disabled={isLoadingReport}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {isLoadingReport ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Cargando...
-                      </>
-                    ) : (
-                      <>
-                        <BarChart3 className="w-4 h-4" />
-                        Ver Reporte Actual
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fetchWeeklyReport()}
+                      disabled={isLoadingReport}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#f6a07a] text-white rounded-lg font-medium hover:bg-[#e58e6a] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {isLoadingReport ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Cargando...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="w-4 h-4" />
+                          Ver Reporte Actual
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleDownloadExcel}
+                      disabled={isDownloading}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Descargando...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          Descargar Excel
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Current Week Info */}
@@ -900,7 +1074,7 @@ export default function AdminDashboard() {
 
                     <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="bg-indigo-50 rounded-lg p-3 text-center">
-                        <div className="text-2xl font-bold text-indigo-600">{weeklyReport.totalOrders}</div>
+                        <div className="text-2xl font-bold text-[#E8775A]">{weeklyReport.totalOrders}</div>
                         <div className="text-xs text-gray-600">Pedidos Totales</div>
                       </div>
                       <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -995,7 +1169,7 @@ export default function AdminDashboard() {
                       type="password"
                       value={settings.telegram_bot_token}
                       onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
                       placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
                     />
                   </div>
@@ -1007,13 +1181,13 @@ export default function AdminDashboard() {
                       type="text"
                       value={settings.telegram_chat_id}
                       onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
                       placeholder="-1001234567890"
                     />
                   </div>
                   <button
                     onClick={handleSaveSettings}
-                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                    className="w-full bg-[#f6a07a] text-white py-3 rounded-xl font-semibold hover:bg-[#e58e6a] transition-colors flex items-center justify-center gap-2"
                   >
                     <Save className="w-5 h-5" />
                     Guardar Configuración
@@ -1045,7 +1219,7 @@ export default function AdminDashboard() {
                   type="text"
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                 />
               </div>
               <div>
@@ -1053,7 +1227,7 @@ export default function AdminDashboard() {
                 <textarea
                   value={productForm.description}
                   onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none resize-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none resize-none"
                   rows={3}
                 />
               </div>
@@ -1063,7 +1237,7 @@ export default function AdminDashboard() {
                   type="number"
                   value={productForm.price}
                   onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                   step="0.01"
                 />
               </div>
@@ -1100,7 +1274,7 @@ export default function AdminDashboard() {
                     className="aspect-video rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
                   >
                     {isUploading ? (
-                      <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                      <Loader2 className="w-8 h-8 text-[#E8775A] animate-spin" />
                     ) : (
                       <>
                         <Upload className="w-8 h-8 text-gray-400 mb-2" />
@@ -1134,7 +1308,7 @@ export default function AdminDashboard() {
                       setImagePreview(null)
                     }}
                     placeholder="https://..."
-                    className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none text-sm"
+                    className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none text-sm"
                   />
                 </div>
               </div>
@@ -1145,14 +1319,19 @@ export default function AdminDashboard() {
                 <div className="relative">
                   <select
                     value={productForm.category}
-                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value as CategoryId })}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-10"
+                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none appearance-none bg-white pr-10"
                   >
                     <option value="">Sin categoría</option>
-                    {SKINCARE_CATEGORIES.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.name}
-                      </option>
+                    {categories.map((cat) => (
+                      <optgroup key={cat.id} label={`${cat.icon} ${cat.name}`}>
+                        <option value={cat.id}>{cat.icon} {cat.name} (principal)</option>
+                        {cat.subcategories?.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.icon} {sub.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
@@ -1165,7 +1344,7 @@ export default function AdminDashboard() {
                   type="number"
                   value={productForm.stock}
                   onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                 />
               </div>
               <button
@@ -1175,7 +1354,7 @@ export default function AdminDashboard() {
                   'w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2',
                   isUploading
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    : 'bg-[#f6a07a] text-white hover:bg-[#e58e6a]'
                 )}
               >
                 {isUploading ? (
@@ -1186,6 +1365,119 @@ export default function AdminDashboard() {
                 ) : (
                   editingProduct ? 'Guardar Cambios' : 'Crear Producto'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCategoryModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">
+                {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+              </h3>
+              <button onClick={() => setShowCategoryModal(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="Nombre de la categoría"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Slug (URL)</label>
+                <input
+                  type="text"
+                  value={categoryForm.slug}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="categoria-url"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Icono (emoji)</label>
+                <input
+                  type="text"
+                  value={categoryForm.icon}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="🧴"
+                />
+              </div>
+              {!editingCategory && categoryForm.parent_id === null && (
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={categoryForm.parent_id !== null}
+                      onChange={(e) => setCategoryForm({
+                        ...categoryForm,
+                        parent_id: e.target.checked ? categories[0]?.id || null : null
+                      })}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Es subcategoría</span>
+                  </label>
+                </div>
+              )}
+              {categoryForm.parent_id && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoría Padre</label>
+                  <select
+                    value={categoryForm.parent_id || ''}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, parent_id: e.target.value || null })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  if (!categoryForm.name || !categoryForm.slug) {
+                    alert('Nombre y slug son requeridos')
+                    return
+                  }
+                  try {
+                    const url = '/api/categories'
+                    const method = editingCategory ? 'PUT' : 'POST'
+                    const body = editingCategory
+                      ? { ...categoryForm, id: editingCategory.id }
+                      : categoryForm
+
+                    const response = await fetch(url, {
+                      method,
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(body),
+                    })
+
+                    if (response.ok) {
+                      setShowCategoryModal(false)
+                      fetchData()
+                    } else {
+                      alert('Error al guardar la categoría')
+                    }
+                  } catch (error) {
+                    console.error('Error saving category:', error)
+                    alert('Error al guardar la categoría')
+                  }
+                }}
+                className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors"
+              >
+                {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
               </button>
             </div>
           </div>
