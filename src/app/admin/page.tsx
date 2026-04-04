@@ -70,9 +70,6 @@ export default function AdminDashboard() {
   const [showEditOrderModal, setShowEditOrderModal] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [orderForm, setOrderForm] = useState({ customer_name: '', phone: '' })
-  const [showEditWeekModal, setShowEditWeekModal] = useState(false)
-  const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
-  const [editWeekForm, setEditWeekForm] = useState({ startDate: '', endDate: '' })
 
   // Categories state
   const [categories, setCategories] = useState<Category[]>([])
