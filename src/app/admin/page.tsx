@@ -293,7 +293,7 @@ export default function AdminDashboard() {
       price: product.price.toString(),
       image_url: product.image_url || '',
       stock: product.stock.toString(),
-      category: (product as Product & { category?: string }).category || '',
+      category: (product.category || '') as CategoryId | '',
     })
     setImagePreview(product.image_url || null)
     setShowProductModal(true)
