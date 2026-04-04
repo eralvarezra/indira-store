@@ -8,11 +8,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Indira Store - Catálogo de Productos",
-  description: "Explora nuestro catálogo de productos y realiza tu pedido de forma fácil y rápida.",
+  title: "Indira Store - Skincare",
+  description: "Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/logo.png",
   },
 };
 
@@ -22,6 +22,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#4f46e5",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -31,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${inter.variable} antialiased`} suppressHydrationWarning>
-      <body className="min-h-screen bg-gray-50 font-sans" suppressHydrationWarning>
+      <body className="min-h-screen bg-gray-50 font-sans overflow-x-hidden" suppressHydrationWarning>
         {children}
       </body>
     </html>

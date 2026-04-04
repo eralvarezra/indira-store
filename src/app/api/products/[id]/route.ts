@@ -55,6 +55,7 @@ export async function PUT(
         price: body.price,
         image_url: body.image_url,
         stock: body.stock,
+        category: body.category,
       })
       if (product) {
         return NextResponse.json({ product })
@@ -70,6 +71,7 @@ export async function PUT(
         price: body.price,
         image_url: body.image_url,
         stock: body.stock,
+        category: body.category,
       } as never)
       .eq('id', id)
       .select()

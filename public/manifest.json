@@ -1,7 +1,7 @@
 {
   "name": "Indira Store",
   "short_name": "Indira",
-  "description": "Catálogo de productos con pedidos vía Telegram",
+  "description": "Catálogo de productos de skincare con pedidos vía Telegram",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f9fafb",
@@ -9,14 +9,10 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

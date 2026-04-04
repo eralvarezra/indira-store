@@ -30,34 +30,34 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
         onClick={closeCart}
       />
 
-      {/* Drawer */}
+      {/* Drawer - Full width on mobile */}
       <div
         className={clsx(
-          'fixed inset-y-0 right-0 w-full max-w-md bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-out',
+          'fixed inset-0 sm:inset-y-0 sm:right-0 sm:w-full sm:max-w-md bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-out',
           state.isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10 safe-top">
           <div className="flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-indigo-600" />
             <h2 className="text-lg font-bold text-gray-900">Tu Carrito</h2>
             {totalItems > 0 && (
-              <span className="bg-indigo-100 text-indigo-600 text-sm font-medium px-2 py-0.5 rounded-full">
-                {totalItems} {totalItems === 1 ? 'item' : 'items'}
+              <span className="bg-indigo-100 text-indigo-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                {totalItems}
               </span>
             )}
           </div>
           <button
             onClick={closeCart}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 active:bg-gray-100 rounded-full transition-colors touch-target"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex flex-col h-[calc(100vh-140px)]">
+        <div className="flex flex-col h-[calc(100vh-130px)] sm:h-[calc(100vh-140px)]">
           {state.items.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -71,20 +71,21 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
           ) : (
             <>
               {/* Items List */}
-              <div className="flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 py-4 scroll-container">
+                <div className="space-y-3">
                   {state.items.map((item) => (
                     <div
                       key={item.product.id}
                       className="flex gap-3 bg-gray-50 rounded-xl p-3"
                     >
                       {/* Image */}
-                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                         {item.product.image_url ? (
                           <img
                             src={item.product.image_url}
                             alt={item.product.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -98,7 +99,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                         <h3 className="font-medium text-gray-900 text-sm line-clamp-1">
                           {item.product.name}
                         </h3>
-                        <p className="text-indigo-600 font-semibold text-sm mt-1">
+                        <p className="text-indigo-600 font-semibold text-sm mt-0.5">
                           {formatPrice(item.product.price)}
                         </p>
 
@@ -107,25 +108,25 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                              className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                              className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors touch-target"
                             >
-                              <Minus className="w-3 h-3 text-gray-600" />
+                              <Minus className="w-3.5 h-3.5 text-gray-600" />
                             </button>
-                            <span className="w-8 text-center text-sm font-medium">
+                            <span className="w-7 text-center text-sm font-medium">
                               {item.quantity}
                             </span>
                             <button
                               onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                               disabled={item.quantity >= item.product.stock}
-                              className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                             >
-                              <Plus className="w-3 h-3 text-gray-600" />
+                              <Plus className="w-3.5 h-3.5 text-gray-600" />
                             </button>
                           </div>
 
                           <button
                             onClick={() => removeItem(item.product.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                            className="p-2 text-gray-400 active:text-red-500 active:bg-red-50 rounded-full transition-colors touch-target"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -137,11 +138,11 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
               </div>
 
               {/* Footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 space-y-4">
+              <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 space-y-3 safe-bottom">
                 {/* Total */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Total</span>
-                  <span className="text-2xl font-bold text-gray-900">
+                  <span className="text-xl font-bold text-gray-900">
                     {formatPrice(totalPrice)}
                   </span>
                 </div>
@@ -150,7 +151,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                 <div className="flex gap-3">
                   <button
                     onClick={clearCart}
-                    className="px-4 py-3 text-red-600 bg-red-50 rounded-xl font-medium hover:bg-red-100 transition-colors"
+                    className="px-4 py-3 text-red-600 bg-red-50 rounded-xl font-medium active:bg-red-100 transition-colors touch-target"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -159,7 +160,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                       closeCart()
                       onCheckout()
                     }}
-                    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 active:scale-[0.98] transition-all"
+                    className="flex-1 bg-indigo-600 text-white py-3.5 rounded-xl font-semibold active:bg-indigo-700 active:scale-[0.98] transition-all touch-target"
                   >
                     Proceder al Pago
                   </button>

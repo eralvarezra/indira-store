@@ -9,6 +9,7 @@ export interface DemoProduct {
   image_url: string | null
   stock: number
   discount_percentage: number
+  category: string | null
   created_at: string
 }
 
@@ -37,6 +38,7 @@ const initialProducts: DemoProduct[] = [
     image_url: 'https://via.placeholder.com/400',
     stock: 10,
     discount_percentage: 0,
+    category: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -47,6 +49,7 @@ const initialProducts: DemoProduct[] = [
     image_url: 'https://via.placeholder.com/400',
     stock: 5,
     discount_percentage: 0,
+    category: null,
     created_at: new Date().toISOString(),
   },
 ]
@@ -73,6 +76,7 @@ export function createProduct(data: Omit<DemoProduct, 'id' | 'created_at'>): Dem
   const product: DemoProduct = {
     ...data,
     discount_percentage: data.discount_percentage || 0,
+    category: data.category || null,
     id: generateId(),
     created_at: new Date().toISOString(),
   }

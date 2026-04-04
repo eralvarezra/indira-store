@@ -46,10 +46,12 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Lock className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+          <img
+            src="/logo.png"
+            alt="Indira Store"
+            className="h-16 w-auto mx-auto mb-4"
+          />
+          <h1 className="text-2xl font-bold text-gray-900">Panel de Admin</h1>
           <p className="text-gray-500 mt-1">Ingresa tu contraseña para continuar</p>
         </div>
 
@@ -109,7 +111,9 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="text-center text-gray-400 text-sm mt-6">
-          Indira Store Admin Panel
+          <a href="/" className="hover:text-indigo-600 transition-colors">
+            ← Volver al catálogo
+          </a>
         </p>
       </div>
     </div>

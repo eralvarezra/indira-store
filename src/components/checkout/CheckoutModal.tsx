@@ -156,17 +156,22 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
+      {/* Modal - Bottom sheet on mobile */}
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden animate-in fade-in slide-up duration-200">
+        {/* Drag handle for mobile */}
+        <div className="flex justify-center pt-3 sm:hidden">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
         {isSuccess ? (
-          <div className="p-8 text-center">
+          <div className="p-6 sm:p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
@@ -180,22 +185,22 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         ) : (
           <>
             {/* Header */}
-            <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+            <div className="border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-indigo-600" />
                 <h2 className="text-lg font-bold text-gray-900">Confirmar Pedido</h2>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 active:bg-gray-100 rounded-full transition-colors touch-target"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             {/* Order Summary */}
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <div className="px-4 sm:px-6 py-3 bg-gray-50 border-b border-gray-100">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>Productos ({totalItems})</span>
                 <span>{formatPrice(totalPrice)}</span>
               </div>
@@ -206,7 +211,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto scroll-container" style={{ maxHeight: 'calc(90vh - 200px)' }}>
               {/* Name Input */}
               <div>
                 <label
@@ -221,12 +226,13 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   value={formData.customer_name}
                   onChange={(e) => handleInputChange('customer_name', e.target.value)}
                   className={clsx(
-                    'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none',
+                    'w-full px-4 py-3.5 rounded-xl border-2 transition-colors outline-none text-base',
                     errors.customer_name
                       ? 'border-red-300 focus:border-red-500'
                       : 'border-gray-200 focus:border-indigo-500'
                   )}
                   placeholder="Tu nombre"
+                  autoComplete="name"
                 />
                 {errors.customer_name && (
                   <p className="mt-1 text-sm text-red-500">{errors.customer_name}</p>
@@ -246,7 +252,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     id="country_code"
                     value={formData.country_code}
                     onChange={(e) => handleInputChange('country_code', e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-10"
+                    className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-10 text-base"
                   >
                     {countries.map((country) => (
                       <option key={country.code} value={country.code}>
@@ -268,7 +274,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </label>
                 <div className="flex gap-2">
                   {selectedCountry.prefix && (
-                    <div className="flex items-center px-4 py-3 bg-gray-100 rounded-xl border-2 border-gray-200 text-gray-600 font-medium">
+                    <div className="flex items-center px-4 py-3.5 bg-gray-100 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-base">
                       {selectedCountry.prefix}
                     </div>
                   )}
@@ -278,13 +284,14 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     value={formData.phone}
                     onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
                     className={clsx(
-                      'flex-1 px-4 py-3 rounded-xl border-2 transition-colors outline-none',
+                      'flex-1 px-4 py-3.5 rounded-xl border-2 transition-colors outline-none text-base',
                       errors.phone
                         ? 'border-red-300 focus:border-red-500'
                         : 'border-gray-200 focus:border-indigo-500'
                     )}
                     placeholder={selectedCountry.placeholder}
                     maxLength={selectedCountry.digits > 0 ? selectedCountry.digits : 15}
+                    autoComplete="tel"
                   />
                 </div>
                 {errors.phone && (
@@ -297,10 +304,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 type="submit"
                 disabled={isSubmitting || state.items.length === 0}
                 className={clsx(
-                  'w-full py-4 rounded-xl font-semibold text-white transition-all',
+                  'w-full py-4 rounded-xl font-semibold text-white transition-all touch-target text-base',
                   isSubmitting || state.items.length === 0
                     ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98]'
+                    : 'bg-indigo-600 active:bg-indigo-700 active:scale-[0.98]'
                 )}
               >
                 {isSubmitting ? (

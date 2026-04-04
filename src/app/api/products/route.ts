@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
         image_url: body.image_url || null,
         stock: body.stock || 0,
         discount_percentage: body.discount_percentage || 0,
+        category: body.category || null,
       })
       return NextResponse.json({ product })
     }
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
         image_url: body.image_url || null,
         stock: body.stock || 0,
         discount_percentage: body.discount_percentage || 0,
+        category: body.category || null,
       } as never)
       .select()
       .single()

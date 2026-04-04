@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag } from 'lucide-react'
+import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
-import { Product, Order } from '@/types/database.types'
+import { Product, Order, SKINCARE_CATEGORIES, CategoryId } from '@/types/database.types'
 
 type Tab = 'products' | 'orders' | 'promos' | 'settings'
 
@@ -23,6 +23,7 @@ export default function AdminDashboard() {
     price: '',
     image_url: '',
     stock: '',
+    category: '' as CategoryId | '',
   })
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -127,6 +128,7 @@ export default function AdminDashboard() {
         price: parseFloat(productForm.price) || 0,
         image_url: productForm.image_url || null,
         stock: parseInt(productForm.stock) || 0,
+        category: productForm.category || null,
       }
 
       let response
@@ -147,7 +149,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         setShowProductModal(false)
         setEditingProduct(null)
-        setProductForm({ name: '', description: '', price: '', image_url: '', stock: '' })
+        setProductForm({ name: '', description: '', price: '', image_url: '', stock: '', category: '' })
         setImagePreview(null)
         fetchData()
       }
@@ -291,6 +293,7 @@ export default function AdminDashboard() {
       price: product.price.toString(),
       image_url: product.image_url || '',
       stock: product.stock.toString(),
+      category: (product as Product & { category?: string }).category || '',
     })
     setImagePreview(product.image_url || null)
     setShowProductModal(true)
@@ -299,7 +302,7 @@ export default function AdminDashboard() {
   const closeModal = () => {
     setShowProductModal(false)
     setEditingProduct(null)
-    setProductForm({ name: '', description: '', price: '', image_url: '', stock: '' })
+    setProductForm({ name: '', description: '', price: '', image_url: '', stock: '', category: '' })
     setImagePreview(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -321,14 +324,21 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 safe-top">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Indira Store Admin</h1>
+        <div className="px-4 py-3 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2">
+            <img
+              src="/logo.png"
+              alt="Indira Store"
+              className="h-8 w-auto"
+            />
+            <span className="text-sm font-medium text-gray-500">Admin</span>
+          </a>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+            className="flex items-center gap-2 text-gray-600 active:text-red-600 transition-colors px-3 py-2 touch-target"
           >
             <LogOut className="w-5 h-5" />
             <span className="hidden sm:inline">Cerrar Sesión</span>
@@ -337,26 +347,26 @@ export default function AdminDashboard() {
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex gap-4">
+      <div className="bg-white border-b overflow-x-auto">
+        <div className="px-4">
+          <nav className="flex gap-1">
             {[
               { id: 'products' as Tab, label: 'Productos', icon: Package },
               { id: 'orders' as Tab, label: 'Pedidos', icon: ShoppingBag },
-              { id: 'promos' as Tab, label: 'Promociones', icon: Tag },
-              { id: 'settings' as Tab, label: 'Configuración', icon: Settings },
+              { id: 'promos' as Tab, label: 'Promos', icon: Tag },
+              { id: 'settings' as Tab, label: 'Config', icon: Settings },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={clsx(
-                  'flex items-center gap-2 px-4 py-3 font-medium transition-colors border-b-2',
+                  'flex items-center gap-1.5 px-3 py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm',
                   activeTab === tab.id
                     ? 'text-indigo-600 border-indigo-600'
-                    : 'text-gray-500 border-transparent hover:text-gray-700'
+                    : 'text-gray-500 border-transparent active:text-gray-700'
                 )}
               >
-                <tab.icon className="w-5 h-5" />
+                <tab.icon className="w-4 h-4" />
                 {tab.label}
               </button>
             ))}
@@ -365,7 +375,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="px-3 py-4 pb-24">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -847,6 +857,26 @@ export default function AdminDashboard() {
                     placeholder="https://..."
                     className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none text-sm"
                   />
+                </div>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <div className="relative">
+                  <select
+                    value={productForm.category}
+                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value as CategoryId })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-10"
+                  >
+                    <option value="">Sin categoría</option>
+                    {SKINCARE_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 

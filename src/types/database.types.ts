@@ -1,3 +1,19 @@
+// Skincare product categories
+export const SKINCARE_CATEGORIES = [
+  { id: 'cleansers', name: 'Limpiadores', icon: '🧼' },
+  { id: 'toners', name: 'Tónicos', icon: '💧' },
+  { id: 'serums', name: 'Sérums', icon: '✨' },
+  { id: 'moisturizers', name: 'Hidratantes', icon: '🧴' },
+  { id: 'sunscreen', name: 'Protectores Solares', icon: '☀️' },
+  { id: 'masks', name: 'Mascarillas', icon: '🎭' },
+  { id: 'exfoliants', name: 'Exfoliantes', icon: '🌿' },
+  { id: 'oils', name: 'Aceites', icon: '🫒' },
+  { id: 'treatments', name: 'Tratamientos', icon: '💊' },
+  { id: 'eye-care', name: 'Contorno de Ojos', icon: '👁️' },
+] as const
+
+export type CategoryId = typeof SKINCARE_CATEGORIES[number]['id']
+
 export type Json =
   | string
   | number
@@ -18,6 +34,7 @@ export interface Database {
           image_url: string
           stock: number
           discount_percentage: number
+          category: string
           created_at: string
         }
         Insert: {
@@ -28,6 +45,7 @@ export interface Database {
           image_url?: string
           stock?: number
           discount_percentage?: number
+          category?: string
           created_at?: string
         }
         Update: {
@@ -38,6 +56,7 @@ export interface Database {
           image_url?: string
           stock?: number
           discount_percentage?: number
+          category?: string
           created_at?: string
         }
       }
@@ -126,4 +145,9 @@ export function formatPriceWithDiscount(price: number, discountPercentage: numbe
     discounted: getDiscountedPrice(price, discountPercentage),
     hasDiscount: discountPercentage > 0
   }
+}
+
+// Helper to get category info
+export function getCategoryInfo(categoryId: string) {
+  return SKINCARE_CATEGORIES.find(c => c.id === categoryId) || null
 }

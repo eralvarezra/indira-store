@@ -11,7 +11,10 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(taskkill /f /im node.exe)",
       "Bash(curl -s http://localhost:3000/api/products)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(scp:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy.ps1)",
+      "Bash(git add:*)"
     ]
   }
 }
