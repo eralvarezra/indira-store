@@ -582,6 +582,18 @@ export default function AdminDashboard() {
     ? orders
     : orders.filter(order => order.week_cycle_id === selectedCycleId)
 
+  // Filter categories that have products
+  const categoriesWithProducts = categories.filter(category => {
+    const hasProducts = products.some(p => p.category === category.slug)
+    const hasSubcategoriesWithProducts = category.subcategories?.some(sub =>
+      products.some(p => p.category === sub.slug)
+    )
+    return hasProducts || hasSubcategoriesWithProducts
+  })
+
+  // Products without category
+  const productsWithoutCategory = products.filter(p => !p.category)
+
   const openEditModal = (product: Product) => {
     setEditingProduct(product)
     setProductForm({
@@ -724,7 +736,14 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className="p-4">
-                        <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                          {!product.category && (
+                            <span className="flex-shrink-0 px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-medium">
+                              Sin categoría
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500 line-clamp-2 mt-1">{product.description}</p>
                         <div className="flex items-center justify-between mt-3">
                           <span className="text-lg font-bold text-[#E8775A]">{formatPrice(product.price)}</span>
@@ -1060,7 +1079,14 @@ export default function AdminDashboard() {
             {activeTab === 'categories' && (
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold">Gestión de Categorías</h2>
+                  <div>
+                    <h2 className="text-lg font-semibold">Gestión de Categorías</h2>
+                    {productsWithoutCategory.length > 0 && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        ⚠️ {productsWithoutCategory.length} producto(s) sin categoría
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => {
                       setEditingCategory(null)
@@ -1074,92 +1100,89 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Main Categories */}
+                {/* Main Categories with Products */}
                 <div className="space-y-4">
-                  {categories.map((category) => (
-                    <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{category.icon}</span>
-                          <div>
-                            <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                            <p className="text-sm text-gray-500">{category.subcategories?.length || 0} subcategorías</p>
+                  {categoriesWithProducts.map((category) => {
+                    const categoryProductCount = products.filter(p => p.category === category.slug).length
+                    const subcategoriesWithProducts = category.subcategories?.filter(sub =>
+                      products.some(p => p.category === sub.slug)
+                    ) || []
+
+                    return (
+                      <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <div className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{category.icon}</span>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                              <p className="text-sm text-gray-500">
+                                {categoryProductCount} producto{categoryProductCount !== 1 ? 's' : ''}
+                                {subcategoriesWithProducts.length > 0 && ` · ${subcategoriesWithProducts.length} subcategoría${subcategoriesWithProducts.length !== 1 ? 's' : ''}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingCategory(category)
+                                setCategoryForm({
+                                  name: category.name,
+                                  slug: category.slug,
+                                  icon: category.icon || '',
+                                  parent_id: null,
+                                  sort_order: category.sort_order,
+                                })
+                                setShowCategoryModal(true)
+                              }}
+                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingCategory(category)
-                              setCategoryForm({
-                                name: category.name,
-                                slug: category.slug,
-                                icon: category.icon || '',
-                                parent_id: null,
-                                sort_order: category.sort_order,
-                              })
-                              setShowCategoryModal(true)
-                            }}
-                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Subcategories */}
-                      {category.subcategories && category.subcategories.length > 0 && (
-                        <div className="border-t bg-gray-50 p-3 space-y-2">
-                          {category.subcategories.map((sub) => (
-                            <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <span>{sub.icon}</span>
-                                <span className="text-sm text-gray-700">{sub.name}</span>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setEditingCategory(sub)
-                                  setCategoryForm({
-                                    name: sub.name,
-                                    slug: sub.slug,
-                                    icon: sub.icon || '',
-                                    parent_id: sub.parent_id,
-                                    sort_order: sub.sort_order,
-                                  })
-                                  setShowCategoryModal(true)
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            onClick={() => {
-                              setEditingCategory(null)
-                              setCategoryForm({
-                                name: '',
-                                slug: '',
-                                icon: '',
-                                parent_id: category.id,
-                                sort_order: (category.subcategories?.length || 0) + 1,
-                              })
-                              setShowCategoryModal(true)
-                            }}
-                            className="w-full py-2 text-sm text-[#f6a07a] hover:bg-[#f6a07a]/10 rounded-lg transition-colors flex items-center justify-center gap-1"
-                          >
-                            <Plus className="w-4 h-4" />
-                            Agregar subcategoría
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {/* Subcategories with Products */}
+                        {subcategoriesWithProducts.length > 0 && (
+                          <div className="border-t bg-gray-50 p-3 space-y-2">
+                            {subcategoriesWithProducts.map((sub) => {
+                              const subProductCount = products.filter(p => p.category === sub.slug).length
+                              return (
+                                <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <span>{sub.icon}</span>
+                                    <span className="text-sm text-gray-700">{sub.name}</span>
+                                    <span className="text-xs text-gray-400">({subProductCount})</span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setEditingCategory(sub)
+                                      setCategoryForm({
+                                        name: sub.name,
+                                        slug: sub.slug,
+                                        icon: sub.icon || '',
+                                        parent_id: sub.parent_id,
+                                        sort_order: sub.sort_order,
+                                      })
+                                      setShowCategoryModal(true)
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
 
-                {categories.length === 0 && (
+                {categoriesWithProducts.length === 0 && (
                   <div className="text-center py-12">
                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay categorías. Crea la primera.</p>
+                    <p className="text-gray-500">No hay categorías con productos.</p>
                   </div>
                 )}
               </div>
