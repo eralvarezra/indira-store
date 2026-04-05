@@ -1109,89 +1109,98 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Main Categories with Products */}
-                <div className="space-y-4">
-                  {categoriesWithProducts.map((category) => {
-                    const categoryProductCount = products.filter(p => p.category === category.id).length
-                    const subcategoriesWithProducts = category.subcategories?.filter(sub =>
-                      categoryIdsWithProducts.has(sub.id)
-                    ) || []
-
-                    return (
-                      <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div className="p-4 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{category.icon}</span>
-                            <div>
-                              <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                              <p className="text-sm text-gray-500">
-                                {categoryProductCount} producto{categoryProductCount !== 1 ? 's' : ''}
-                                {subcategoriesWithProducts.length > 0 && ` · ${subcategoriesWithProducts.length} subcategoría${subcategoriesWithProducts.length !== 1 ? 's' : ''}`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingCategory(category)
-                                setCategoryForm({
-                                  name: category.name,
-                                  slug: category.slug,
-                                  icon: category.icon || '',
-                                  parent_id: null,
-                                  sort_order: category.sort_order,
-                                })
-                                setShowCategoryModal(true)
-                              }}
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Subcategories with Products */}
-                        {subcategoriesWithProducts.length > 0 && (
-                          <div className="border-t bg-gray-50 p-3 space-y-2">
-                            {subcategoriesWithProducts.map((sub) => {
-                              const subProductCount = products.filter(p => p.category === sub.id).length
-                              return (
-                                <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
-                                  <div className="flex items-center gap-2">
-                                    <span>{sub.icon}</span>
-                                    <span className="text-sm text-gray-700">{sub.name}</span>
-                                    <span className="text-xs text-gray-400">({subProductCount})</span>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      setEditingCategory(sub)
-                                      setCategoryForm({
-                                        name: sub.name,
-                                        slug: sub.slug,
-                                        icon: sub.icon || '',
-                                        parent_id: sub.parent_id,
-                                        sort_order: sub.sort_order,
-                                      })
-                                      setShowCategoryModal(true)
-                                    }}
-                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {categoriesWithProducts.length === 0 && (
+                {products.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay productos. Las categorías aparecerán cuando agregues productos.</p>
+                  </div>
+                ) : categoriesWithProducts.length === 0 ? (
                   <div className="text-center py-12">
                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay categorías con productos.</p>
+                    <p className="text-gray-500">No hay categorías con productos. Asigna categorías a tus productos.</p>
+                    {productsWithoutCategory.length > 0 && (
+                      <p className="text-sm text-amber-600 mt-2">
+                        Tienes {productsWithoutCategory.length} producto(s) sin categoría asignada.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {categoriesWithProducts.map((category) => {
+                      const categoryProductCount = products.filter(p => p.category === category.id).length
+                      const subcategoriesWithProducts = category.subcategories?.filter(sub =>
+                        categoryIdsWithProducts.has(sub.id)
+                      ) || []
+
+                      return (
+                        <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                          <div className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{category.icon}</span>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                                <p className="text-sm text-gray-500">
+                                  {categoryProductCount} producto{categoryProductCount !== 1 ? 's' : ''}
+                                  {subcategoriesWithProducts.length > 0 && ` · ${subcategoriesWithProducts.length} subcategoría${subcategoriesWithProducts.length !== 1 ? 's' : ''}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingCategory(category)
+                                  setCategoryForm({
+                                    name: category.name,
+                                    slug: category.slug,
+                                    icon: category.icon || '',
+                                    parent_id: null,
+                                    sort_order: category.sort_order,
+                                  })
+                                  setShowCategoryModal(true)
+                                }}
+                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Subcategories with Products */}
+                          {subcategoriesWithProducts.length > 0 && (
+                            <div className="border-t bg-gray-50 p-3 space-y-2">
+                              {subcategoriesWithProducts.map((sub) => {
+                                const subProductCount = products.filter(p => p.category === sub.id).length
+                                return (
+                                  <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                      <span>{sub.icon}</span>
+                                      <span className="text-sm text-gray-700">{sub.name}</span>
+                                      <span className="text-xs text-gray-400">({subProductCount})</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory(sub)
+                                        setCategoryForm({
+                                          name: sub.name,
+                                          slug: sub.slug,
+                                          icon: sub.icon || '',
+                                          parent_id: sub.parent_id,
+                                          sort_order: sub.sort_order,
+                                        })
+                                        setShowCategoryModal(true)
+                                      }}
+                                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
