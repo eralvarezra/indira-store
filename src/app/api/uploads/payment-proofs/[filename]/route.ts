@@ -10,22 +10,25 @@ export async function GET(
   try {
     const { filename } = await params
 
-    // Validate filename to prevent directory traversal
-    if (!filename || filename.includes('..') || filename.includes('/')) {
+    // Security: prevent directory traversal
+    const safeName = filename.replace(/\.\./g, '').replace(/\//g, '')
+    if (safeName !== filename) {
       return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
     }
 
-    const filepath = path.join(process.cwd(), 'public', 'uploads', filename)
+    // Determine the uploads directory
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'payment-proofs')
+    const filePath = path.join(uploadsDir, safeName)
 
     // Check if file exists
-    if (!existsSync(filepath)) {
+    if (!existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
-    // Read file
-    const buffer = await readFile(filepath)
+    // Read and return the file
+    const fileBuffer = await readFile(filePath)
 
-    // Determine content type
+    // Determine content type based on extension
     const ext = filename.split('.').pop()?.toLowerCase()
     const contentTypes: Record<string, string> = {
       'jpg': 'image/jpeg',
@@ -36,7 +39,7 @@ export async function GET(
     }
     const contentType = contentTypes[ext || ''] || 'application/octet-stream'
 
-    return new NextResponse(buffer, {
+    return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',

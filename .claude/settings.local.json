@@ -20,7 +20,9 @@
       "Bash(bash deploy-hetzner.sh)",
       "WebSearch",
       "WebFetch(domain:gist.github.com)",
-      "WebFetch(domain:gist.githubusercontent.com)"
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "Bash(rm -rf \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\[filename]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\payment-proofs\\\\[filename]\")"
     ]
   }
 }
