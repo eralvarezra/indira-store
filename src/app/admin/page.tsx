@@ -584,9 +584,11 @@ export default function AdminDashboard() {
 
   // Filter categories that have products
   const categoriesWithProducts = categories.filter(category => {
-    const hasProducts = products.some(p => p.category === category.slug)
+    // Check if any product has this category (by ID)
+    const hasProducts = products.some(p => p.category === category.id)
+    // Check if any subcategory has products
     const hasSubcategoriesWithProducts = category.subcategories?.some(sub =>
-      products.some(p => p.category === sub.slug)
+      products.some(p => p.category === sub.id)
     )
     return hasProducts || hasSubcategoriesWithProducts
   })
@@ -1103,9 +1105,9 @@ export default function AdminDashboard() {
                 {/* Main Categories with Products */}
                 <div className="space-y-4">
                   {categoriesWithProducts.map((category) => {
-                    const categoryProductCount = products.filter(p => p.category === category.slug).length
+                    const categoryProductCount = products.filter(p => p.category === category.id).length
                     const subcategoriesWithProducts = category.subcategories?.filter(sub =>
-                      products.some(p => p.category === sub.slug)
+                      products.some(p => p.category === sub.id)
                     ) || []
 
                     return (
@@ -1145,7 +1147,7 @@ export default function AdminDashboard() {
                         {subcategoriesWithProducts.length > 0 && (
                           <div className="border-t bg-gray-50 p-3 space-y-2">
                             {subcategoriesWithProducts.map((sub) => {
-                              const subProductCount = products.filter(p => p.category === sub.slug).length
+                              const subProductCount = products.filter(p => p.category === sub.id).length
                               return (
                                 <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
                                   <div className="flex items-center gap-2">
