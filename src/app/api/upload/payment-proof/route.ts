@@ -15,24 +15,12 @@ export async function POST(request: NextRequest) {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Tipo de archivo no válido. Solo se permiten JPEG, PNG, WebP y GIF.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid file type. Only images allowed.' }, { status: 400 })
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'El archivo es muy grande. El tamaño máximo es 5MB.' },
-        { status: 400 }
-      )
-    }
-
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'payment-proofs')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
+      return NextResponse.json({ error: 'File too large. Max 5MB.' }, { status: 400 })
     }
 
     // Generate unique filename
@@ -41,22 +29,24 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop() || 'jpg'
     const filename = `proof-${timestamp}-${randomStr}.${ext}`
 
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'payment-proofs')
+    if (!existsSync(uploadsDir)) {
+      await mkdir(uploadsDir, { recursive: true })
+    }
+
     // Save file
+    const filePath = path.join(uploadsDir, filename)
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    const filepath = path.join(uploadsDir, filename)
-    await writeFile(filepath, buffer)
+    await writeFile(filePath, buffer)
 
-    // Return URL
-    const imageUrl = `/uploads/payment-proofs/${filename}`
+    // Return the public URL path
+    const url = `/uploads/payment-proofs/${filename}`
 
-    return NextResponse.json({
-      success: true,
-      url: imageUrl,
-      filename
-    })
+    return NextResponse.json({ success: true, url })
   } catch (error) {
     console.error('Upload error:', error)
-    return NextResponse.json({ error: 'Error al subir el archivo' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
   }
 }
