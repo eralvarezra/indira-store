@@ -114,35 +114,29 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     return stock <= 0
   })
 
+  // Calculate totals by type
+  const hasPreOrderItems = preOrderItems.length > 0
+
+  // Calculate in-stock total
+  const inStockTotal = inStockItems.reduce((sum, item) => {
+    const price = getEffectivePrice(item.product, item.variant)
+    const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+    return sum + discountedPrice * item.quantity
+  }, 0)
+
+  // Calculate pre-order total
+  const preOrderTotal = preOrderItems.reduce((sum, item) => {
+    const price = getEffectivePrice(item.product, item.variant)
+    const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+    return sum + discountedPrice * item.quantity
+  }, 0)
+
   // Calculate advance payment:
   // - In-stock items: 100% of their value
   // - Pre-order items: 50% of their value (adelanto)
   // - Shipping: 100% always
-  const hasPreOrderItems = preOrderItems.length > 0
-  const calculateAdvancePayment = () => {
-    let advance = 0
-
-    // In-stock items: 100%
-    for (const item of inStockItems) {
-      const price = getEffectivePrice(item.product, item.variant)
-      const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
-      advance += discountedPrice * item.quantity
-    }
-
-    // Pre-order items: 50%
-    for (const item of preOrderItems) {
-      const price = getEffectivePrice(item.product, item.variant)
-      const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
-      advance += discountedPrice * item.quantity * 0.5
-    }
-
-    // Shipping: 100%
-    advance += shippingCost
-
-    return Math.ceil(advance)
-  }
-  const advancePaymentAmount = calculateAdvancePayment()
-  const remainingPaymentAmount = totalWithShipping - advancePaymentAmount
+  const advancePaymentAmount = Math.ceil(inStockTotal + preOrderTotal * 0.5 + shippingCost)
+  const remainingPaymentAmount = Math.ceil(preOrderTotal * 0.5)
 
   const validatePhone = (phone: string, countryCode: string) => {
     const country = countries.find(c => c.code === countryCode)
