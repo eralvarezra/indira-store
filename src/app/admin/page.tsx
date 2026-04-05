@@ -1193,7 +1193,15 @@ export default function AdminDashboard() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <span className="font-medium text-gray-900">{order.customer_name}</span>
-                                <span className="text-sm text-gray-500">{order.phone}</span>
+                                <a
+                                  href={`https://wa.me/${order.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {order.phone}
+                                </a>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -1440,7 +1448,14 @@ export default function AdminDashboard() {
                               </span>
                             </div>
                             <p className="font-medium text-gray-900">{order.customer_name}</p>
-                            <p className="text-sm text-gray-500">{order.phone}</p>
+                            <a
+                              href={`https://wa.me/${order.phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
+                            >
+                              {order.phone}
+                            </a>
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <p className="text-xs text-gray-400">
                                 {orderItems.slice(0, 2).map(item => `${item.name} x${item.quantity}`).join(', ')}
