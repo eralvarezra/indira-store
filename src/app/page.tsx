@@ -35,7 +35,23 @@ function CatalogContent() {
       const categoriesData = await categoriesRes.json()
 
       setProducts(productsData.products || [])
-      setCategories(categoriesData.categories || [])
+
+      // Build hierarchical structure from flat category list
+      const flatCategories = categoriesData.categories || []
+      const parentCategories = flatCategories.filter((c: Category) => !c.parent_id)
+      const subcategories = flatCategories.filter((c: Category) => c.parent_id)
+
+      const categoriesWithSubcategories = parentCategories.map((parent: Category) => ({
+        ...parent,
+        subcategories: subcategories
+          .filter((sub: Category) => sub.parent_id === parent.id)
+          .map((sub: Category) => ({
+            ...sub,
+            subcategories: []
+          }))
+      }))
+
+      setCategories(categoriesWithSubcategories)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -81,7 +97,6 @@ function CatalogContent() {
     id: 'promociones',
     name: 'Promociones',
     slug: 'promociones',
-    icon: '🏷️',
     parent_id: null,
     sort_order: -1, // Always first
     is_active: true,

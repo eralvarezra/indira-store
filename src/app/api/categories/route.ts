@@ -33,24 +33,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
     }
 
-    // Organize into parent-child structure
-    // Parent categories have parent_id: null
-    // Subcategories have parent_id pointing to their parent
-    const parentCategories = (allCategories || []).filter(cat => !cat.parent_id)
-    const subcategories = (allCategories || []).filter(cat => cat.parent_id)
+    // Type the categories data
+    const categories = allCategories as CategoryData[]
 
-    // Build hierarchical structure
-    const categoriesWithSubcategories = parentCategories.map(parent => ({
-      ...parent,
-      subcategories: subcategories
-        .filter(sub => sub.parent_id === parent.id)
-        .map(sub => ({
-          ...sub,
-          subcategories: [] // Subcategories don't have nested subcategories
-        }))
-    }))
-
-    return NextResponse.json({ categories: categoriesWithSubcategories })
+    // Return flat list of all categories (both parent and subcategories)
+    // The client will handle organizing them as needed
+    return NextResponse.json({ categories })
   } catch (error) {
     console.error('Categories fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -212,7 +200,7 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Default categories for demo mode
+// Default categories for demo mode (flat list)
 function getDefaultCategories() {
   return [
     {
@@ -222,13 +210,58 @@ function getDefaultCategories() {
       parent_id: null,
       sort_order: 1,
       is_active: true,
-      subcategories: [
-        { id: 'limpiadores', name: 'Limpiadores', slug: 'limpiadores', parent_id: 'skin-care', sort_order: 1, is_active: true },
-        { id: 'tonicos', name: 'Tónicos', slug: 'tonicos', parent_id: 'skin-care', sort_order: 2, is_active: true },
-        { id: 'serums', name: 'Sérums', slug: 'serums', parent_id: 'skin-care', sort_order: 3, is_active: true },
-        { id: 'hidratantes', name: 'Hidratantes', slug: 'hidratantes', parent_id: 'skin-care', sort_order: 4, is_active: true },
-        { id: 'protectores', name: 'Protectores Solares', slug: 'protectores-solares', parent_id: 'skin-care', sort_order: 5, is_active: true },
-      ]
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'limpiadores',
+      name: 'Limpiadores',
+      slug: 'limpiadores',
+      parent_id: 'skin-care',
+      sort_order: 1,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'tonicos',
+      name: 'Tónicos',
+      slug: 'tonicos',
+      parent_id: 'skin-care',
+      sort_order: 2,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'serums',
+      name: 'Sérums',
+      slug: 'serums',
+      parent_id: 'skin-care',
+      sort_order: 3,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'hidratantes',
+      name: 'Hidratantes',
+      slug: 'hidratantes',
+      parent_id: 'skin-care',
+      sort_order: 4,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'protectores',
+      name: 'Protectores Solares',
+      slug: 'protectores-solares',
+      parent_id: 'skin-care',
+      sort_order: 5,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
     },
     {
       id: 'maquillaje',
@@ -237,13 +270,58 @@ function getDefaultCategories() {
       parent_id: null,
       sort_order: 2,
       is_active: true,
-      subcategories: [
-        { id: 'labiales', name: 'Labiales', slug: 'labiales', parent_id: 'maquillaje', sort_order: 1, is_active: true },
-        { id: 'bases', name: 'Base y Correctores', slug: 'base-correctores', parent_id: 'maquillaje', sort_order: 2, is_active: true },
-        { id: 'sombras', name: 'Sombras', slug: 'sombras', parent_id: 'maquillaje', sort_order: 3, is_active: true },
-        { id: 'mascaras', name: 'Máscaras de Pestañas', slug: 'mascaras-pestanas', parent_id: 'maquillaje', sort_order: 4, is_active: true },
-        { id: 'rubores', name: 'Rubores', slug: 'rubores', parent_id: 'maquillaje', sort_order: 5, is_active: true },
-      ]
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'labiales',
+      name: 'Labiales',
+      slug: 'labiales',
+      parent_id: 'maquillaje',
+      sort_order: 1,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'bases',
+      name: 'Base y Correctores',
+      slug: 'base-correctores',
+      parent_id: 'maquillaje',
+      sort_order: 2,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'sombras',
+      name: 'Sombras',
+      slug: 'sombras',
+      parent_id: 'maquillaje',
+      sort_order: 3,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'mascaras',
+      name: 'Máscaras de Pestañas',
+      slug: 'mascaras-pestanas',
+      parent_id: 'maquillaje',
+      sort_order: 4,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'rubores',
+      name: 'Rubores',
+      slug: 'rubores',
+      parent_id: 'maquillaje',
+      sort_order: 5,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
     },
     {
       id: 'accesorios',
@@ -252,12 +330,48 @@ function getDefaultCategories() {
       parent_id: null,
       sort_order: 3,
       is_active: true,
-      subcategories: [
-        { id: 'brochas', name: 'Brochas', slug: 'brochas', parent_id: 'accesorios', sort_order: 1, is_active: true },
-        { id: 'esponjas', name: 'Esponjas y Pinceles', slug: 'esponjas-pinceles', parent_id: 'accesorios', sort_order: 2, is_active: true },
-        { id: 'paletas', name: 'Paletas y Mezcladores', slug: 'paletas-mezcladores', parent_id: 'accesorios', sort_order: 3, is_active: true },
-        { id: 'estuches', name: 'Estuches y Organizadores', slug: 'estuches-organizadores', parent_id: 'accesorios', sort_order: 4, is_active: true },
-      ]
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'brochas',
+      name: 'Brochas',
+      slug: 'brochas',
+      parent_id: 'accesorios',
+      sort_order: 1,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'esponjas',
+      name: 'Esponjas y Pinceles',
+      slug: 'esponjas-pinceles',
+      parent_id: 'accesorios',
+      sort_order: 2,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'paletas',
+      name: 'Paletas y Mezcladores',
+      slug: 'paletas-mezcladores',
+      parent_id: 'accesorios',
+      sort_order: 3,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    },
+    {
+      id: 'estuches',
+      name: 'Estuches y Organizadores',
+      slug: 'estuches-organizadores',
+      parent_id: 'accesorios',
+      sort_order: 4,
+      is_active: true,
+      created_at: '',
+      updated_at: ''
     }
   ]
 }
