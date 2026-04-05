@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen } from 'lucide-react'
+import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen, CreditCard } from 'lucide-react'
 import clsx from 'clsx'
 import { Product, Order, Category, ProductVariant, ProductWithVariants, ProductImage, PaymentMethod } from '@/types/database.types'
 
@@ -10,11 +10,11 @@ type Tab = 'products' | 'orders' | 'promos' | 'categories' | 'reports' | 'settin
 
 // Extended Order type with new fields
 interface OrderWithExtras extends Order {
-  order_number?: string | null
-  total_with_shipping?: number | null
-  amount_paid?: number
-  advance_payment?: number | null
-  shipping_cost?: number
+  order_number: string | null
+  total_with_shipping: number | null
+  amount_paid: number
+  advance_payment: number | null
+  shipping_cost: number
 }
 
 interface WeekCycle {
