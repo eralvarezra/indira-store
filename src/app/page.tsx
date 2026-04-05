@@ -205,7 +205,7 @@ function CatalogContent() {
                       )}
                     >
                       {isPromociones && <Percent className="w-4 h-4" />}
-                      {!isPromociones && category.icon && <span>{category.icon}</span>}
+                      {!isPromociones && category.icon && category.icon !== 'null' && <span className="mr-1">{category.icon}</span>}
                       {category.name}
                       {!isPromociones && subcategoriesWithProducts.length > 0 && (
                         isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
@@ -249,7 +249,7 @@ function CatalogContent() {
                           : 'bg-gray-50 text-gray-600 active:bg-gray-100'
                       )}
                     >
-                      {subcat.icon && <span className="mr-1">{subcat.icon}</span>}
+                      {subcat.icon && subcat.icon !== 'null' && <span className="mr-1">{subcat.icon}</span>}
                       {subcat.name}
                     </button>
                   ))}
