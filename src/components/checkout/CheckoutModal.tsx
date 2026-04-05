@@ -20,6 +20,7 @@ interface FormErrors {
   district?: string
   exact_address?: string
   payment_method?: string
+  payment_proof?: string
   billing_name?: string
   billing_province?: string
   billing_canton?: string
@@ -217,6 +218,11 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     // Payment validation
     if (!formData.payment_method) {
       newErrors.payment_method = 'Selecciona un método de pago'
+    }
+
+    // Payment proof validation (required)
+    if (!paymentProof) {
+      newErrors.payment_proof = 'Sube el comprobante de pago para continuar'
     }
 
     // Billing validation (only if different from shipping)
@@ -881,7 +887,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   {/* Payment Proof Upload */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Comprobante de pago (opcional)
+                      Comprobante de pago <span className="text-red-500">*</span>
                     </label>
                     <p className="text-xs text-gray-500 mb-2">
                       Sube una captura de pantalla del comprobante de tu pago
@@ -922,6 +928,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                                 return
                               }
                               setPaymentProof(file)
+                              setErrors(prev => ({ ...prev, payment_proof: undefined }))
                               const reader = new FileReader()
                               reader.onloadend = () => {
                                 setPaymentProofPreview(reader.result as string)
@@ -931,6 +938,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                           }}
                         />
                       </label>
+                    )}
+                    {errors.payment_proof && (
+                      <p className="mt-2 text-sm text-red-500">{errors.payment_proof}</p>
                     )}
                   </div>
                 </section>
