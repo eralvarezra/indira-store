@@ -219,9 +219,7 @@ function CatalogContent() {
             {/* Subcategories */}
             {selectedMainCategory !== 'all' && selectedMainCategory !== 'promociones' && (() => {
               const selectedCat = categoriesWithProducts.find(c => c.id === selectedMainCategory)
-              const subcats = selectedCat?.subcategories?.filter(sub =>
-                categoryIdsWithProducts.has(sub.id)
-              ) || []
+              const subcats = selectedCat?.subcategories || []
 
               if (subcats.length === 0) return null
 
