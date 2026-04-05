@@ -6,7 +6,7 @@ import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, L
 import clsx from 'clsx'
 import { Product, Order, Category, ProductVariant, ProductWithVariants, ProductImage, PaymentMethod } from '@/types/database.types'
 
-type Tab = 'products' | 'orders' | 'promos' | 'categories' | 'reports' | 'settings'
+type Tab = 'products' | 'orders' | 'payment-proofs' | 'promos' | 'categories' | 'reports' | 'settings'
 
 // Extended Order type with new fields
 interface OrderWithExtras extends Order {
@@ -969,6 +969,7 @@ export default function AdminDashboard() {
             {[
               { id: 'products' as Tab, label: 'Productos', icon: Package },
               { id: 'orders' as Tab, label: 'Pedidos', icon: ShoppingBag },
+              { id: 'payment-proofs' as Tab, label: 'Comprobantes', icon: ImageIcon },
               { id: 'promos' as Tab, label: 'Promos', icon: Tag },
               { id: 'categories' as Tab, label: 'Categorías', icon: FolderOpen },
               { id: 'reports' as Tab, label: 'Reportes', icon: BarChart3 },
@@ -1363,6 +1364,77 @@ export default function AdminDashboard() {
                   <div className="text-center py-12">
                     <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-500">No hay pedidos para mostrar.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Payment Proofs Tab */}
+            {activeTab === 'payment-proofs' && (
+              <div>
+                <h2 className="text-lg font-semibold mb-6">Comprobantes de Pago</h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {orders
+                    .filter(order => (order as OrderWithExtras).payment_proof_url)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map(order => {
+                      const orderWithExtras = order as OrderWithExtras
+                      const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
+                      const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number }[] : []
+                      const totalWithShipping = orderWithExtras.total_with_shipping || order.total || 0
+
+                      return (
+                        <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                          <div className="aspect-video bg-gray-100 relative">
+                            <img
+                              src={orderWithExtras.payment_proof_url!}
+                              alt={`Comprobante - ${orderNumber}`}
+                              className="w-full h-full object-cover"
+                              onClick={() => window.open(orderWithExtras.payment_proof_url!, '_blank')}
+                            />
+                          </div>
+                          <div className="p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-mono text-gray-500">#{orderNumber}</span>
+                              <span className={clsx(
+                                'px-2 py-0.5 rounded-full text-xs font-medium',
+                                order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
+                                order.status === 'confirmed' && 'bg-green-100 text-green-700',
+                                order.status === 'cancelled' && 'bg-red-100 text-red-700'
+                              )}>
+                                {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Entregado' : 'Cancelado'}
+                              </span>
+                            </div>
+                            <p className="font-medium text-gray-900">{order.customer_name}</p>
+                            <p className="text-sm text-gray-500">{order.phone}</p>
+                            <div className="mt-2 pt-2 border-t border-gray-100">
+                              <p className="text-xs text-gray-400">
+                                {orderItems.slice(0, 2).map(item => `${item.name} x${item.quantity}`).join(', ')}
+                                {orderItems.length > 2 && ` +${orderItems.length - 2} más`}
+                              </p>
+                              <p className="text-sm font-semibold text-[#E8775A] mt-1">
+                                Total: {formatPrice(totalWithShipping)}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-2">
+                              {new Date(order.created_at).toLocaleDateString('es-CR', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+
+                {orders.filter(order => (order as OrderWithExtras).payment_proof_url).length === 0 && (
+                  <div className="text-center py-12">
+                    <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay comprobantes de pago.</p>
                   </div>
                 )}
               </div>
