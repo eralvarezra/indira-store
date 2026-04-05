@@ -943,20 +943,60 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
                 {/* Order Total */}
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Subtotal productos</span>
-                    <span>{formatPrice(totalPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Envío ({selectedShipping.name})</span>
-                    <span className={shippingCost === 0 ? 'text-green-600 font-medium' : ''}>
-                      {shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-200">
-                    <span>Total a pagar</span>
-                    <span className="text-indigo-600">{formatPrice(totalWithShipping)}</span>
-                  </div>
+                  {/* Payment breakdown for mixed orders */}
+                  {hasPreOrderItems ? (
+                    <>
+                      <div className="flex items-center gap-2 text-amber-700 text-sm font-medium mb-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Pedido con pre-orden</span>
+                      </div>
+                      {inStockItems.length > 0 && (
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Productos disponibles (100%):</span>
+                          <span className="text-green-600 font-medium">{formatPrice(inStockTotal)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Pre-orden adelanto (50%):</span>
+                        <span className="text-amber-600 font-medium">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-400">
+                        <span>Pre-orden restante (al recibir):</span>
+                        <span>{formatPrice(remainingPaymentAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Envío ({selectedShipping.name}):</span>
+                        <span className={shippingCost === 0 ? 'text-green-600 font-medium' : ''}>
+                          {shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)}
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900">
+                        <span>Pagas ahora:</span>
+                        <span className="text-amber-600">{formatPrice(advancePaymentAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>Total del pedido:</span>
+                        <span>{formatPrice(totalWithShipping)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Subtotal productos</span>
+                        <span>{formatPrice(totalPrice)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Envío ({selectedShipping.name})</span>
+                        <span className={shippingCost === 0 ? 'text-green-600 font-medium' : ''}>
+                          {shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-200">
+                        <span>Total a pagar</span>
+                        <span className="text-indigo-600">{formatPrice(totalWithShipping)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Submit Button */}
@@ -975,13 +1015,17 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       <Loader2 className="w-5 h-5 animate-spin" />
                       Procesando...
                     </span>
+                  ) : hasPreOrderItems ? (
+                    `Confirmar Pedido - Pagar ${formatPrice(advancePaymentAmount)}`
                   ) : (
                     `Confirmar Pedido - ${formatPrice(totalWithShipping)}`
                   )}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center">
-                  Te contactaremos para coordinar el pago y la entrega.
+                  {hasPreOrderItems
+                    ? 'Te contactaremos para coordinar el pago del adelanto y la entrega.'
+                    : 'Te contactaremos para coordinar el pago y la entrega.'}
                 </p>
               </div>
             </form>
