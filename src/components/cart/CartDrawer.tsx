@@ -1,7 +1,7 @@
 'use client'
 
 import { useCart } from '@/context/CartContext'
-import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package } from 'lucide-react'
+import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import { getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
 
@@ -29,6 +29,26 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
     const stock = getEffectiveStock(item.product, item.variant)
     return stock <= 0
   })
+
+  const hasPreOrderItems = preOrderItems.length > 0
+
+  // Calculate payment breakdown
+  // In-stock items: 100% | Pre-order items: 50% advance
+  const inStockTotal = inStockItems.reduce((sum, item) => {
+    const price = getEffectivePrice(item.product, item.variant)
+    const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+    return sum + discountedPrice * item.quantity
+  }, 0)
+
+  const preOrderTotal = preOrderItems.reduce((sum, item) => {
+    const price = getEffectivePrice(item.product, item.variant)
+    const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+    return sum + discountedPrice * item.quantity
+  }, 0)
+
+  // Advance payment = 100% in-stock + 50% pre-order
+  const advancePayment = inStockTotal + Math.ceil(preOrderTotal * 0.5)
+  const remainingPayment = Math.ceil(preOrderTotal * 0.5)
 
   return (
     <>
@@ -260,9 +280,39 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
 
               {/* Footer */}
               <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 space-y-3 safe-bottom">
+                {/* Payment breakdown for mixed orders */}
+                {hasPreOrderItems && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-700 text-sm font-medium">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Pedido con pre-orden</span>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      {inStockItems.length > 0 && (
+                        <div className="flex justify-between text-gray-600">
+                          <span>Productos disponibles (100%):</span>
+                          <span className="text-green-600 font-medium">{formatPrice(inStockTotal)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-gray-600">
+                        <span>Pre-orden adelanto (50%):</span>
+                        <span className="text-amber-600 font-medium">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-400 text-xs">
+                        <span>Pre-orden restante (al recibir):</span>
+                        <span>{formatPrice(remainingPayment)}</span>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-200 pt-2 flex justify-between font-semibold">
+                      <span className="text-amber-800">Pagas ahora:</span>
+                      <span className="text-amber-600">{formatPrice(advancePayment)}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Total */}
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Total</span>
+                  <span className="text-gray-600">Total del pedido</span>
                   <span className="text-xl font-bold text-gray-900">
                     {formatPrice(totalPrice)}
                   </span>
@@ -283,7 +333,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                     }}
                     className="flex-1 bg-[#f6a07a] text-white py-3.5 rounded-xl font-semibold active:bg-[#e58e6a] active:scale-[0.98] transition-all touch-target"
                   >
-                    Proceder al Pago
+                    {hasPreOrderItems ? `Pagar ${formatPrice(advancePayment)}` : 'Proceder al Pago'}
                   </button>
                 </div>
               </div>
