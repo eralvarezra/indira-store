@@ -345,7 +345,6 @@ interface TelegramNotification extends OrderRequest {
   totalWithShipping: number
   isPreOrder: boolean
   advancePayment?: number
-  paymentProofUrl?: string | null
 }
 
 async function sendTelegramNotification(order: TelegramNotification) {
