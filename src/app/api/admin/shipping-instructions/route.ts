@@ -11,6 +11,11 @@ const DEFAULT_INSTRUCTIONS: Record<string, string> = {
   outside_gam: 'El paquete será entregado en la dirección indicada en 3-5 días hábiles.'
 }
 
+interface SettingRow {
+  key: string
+  value: string
+}
+
 function verifyAuth(request: NextRequest): boolean {
   const token = request.cookies.get('admin_token')?.value
   if (!token) return false
@@ -48,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Build instructions object
     const instructions: Record<string, string> = { ...DEFAULT_INSTRUCTIONS }
-    settings?.forEach(setting => {
+    ;(settings as SettingRow[] | null)?.forEach(setting => {
       const key = setting.key.replace('shipping_instructions_', '')
       instructions[key] = setting.value || DEFAULT_INSTRUCTIONS[key] || ''
     })
