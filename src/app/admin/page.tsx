@@ -582,15 +582,22 @@ export default function AdminDashboard() {
     ? orders
     : orders.filter(order => order.week_cycle_id === selectedCycleId)
 
-  // Filter categories that have products
+  // Get all category IDs that have products
+  const categoryIdsWithProducts = new Set(
+    products.map(p => p.category).filter((c): c is string => !!c)
+  )
+
+  // Filter categories that have products (directly or through subcategories)
   const categoriesWithProducts = categories.filter(category => {
-    // Check if any product has this category (by ID)
-    const hasProducts = products.some(p => p.category === category.id)
+    // Check if any product has this category
+    if (categoryIdsWithProducts.has(category.id)) {
+      return true
+    }
     // Check if any subcategory has products
-    const hasSubcategoriesWithProducts = category.subcategories?.some(sub =>
-      products.some(p => p.category === sub.id)
-    )
-    return hasProducts || hasSubcategoriesWithProducts
+    if (category.subcategories) {
+      return category.subcategories.some(sub => categoryIdsWithProducts.has(sub.id))
+    }
+    return false
   })
 
   // Products without category
@@ -1107,7 +1114,7 @@ export default function AdminDashboard() {
                   {categoriesWithProducts.map((category) => {
                     const categoryProductCount = products.filter(p => p.category === category.id).length
                     const subcategoriesWithProducts = category.subcategories?.filter(sub =>
-                      products.some(p => p.category === sub.id)
+                      categoryIdsWithProducts.has(sub.id)
                     ) || []
 
                     return (
