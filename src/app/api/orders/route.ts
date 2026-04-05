@@ -18,6 +18,7 @@ interface OrderRequest {
   shipping_cost: number
   // Payment fields
   payment_method?: string | null
+  payment_method_name?: string | null
   payment_proof_url?: string | null
   // Billing fields
   billing_same_as_shipping: boolean
@@ -429,7 +430,7 @@ ${itemsList}📊 *Cantidad:* ${totalItems} artículos
 
 💰 *TOTAL:* ₡${order.totalWithShipping.toFixed(2)}
 
-💳 *Método de pago:* ${order.payment_method || 'No especificado'}
+💳 *Método de pago:* ${order.payment_method_name || order.payment_method || 'No especificado'}
 ${paymentBreakdown}
 
 ${order.shipping_method !== 'pickup' ? `

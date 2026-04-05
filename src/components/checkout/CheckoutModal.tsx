@@ -292,6 +292,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         shipping_method: formData.shipping_method,
         shipping_cost: shippingCost,
         payment_method: formData.payment_method,
+        payment_method_name: paymentMethods.find(m => m.id === formData.payment_method)?.name || 'No especificado',
         payment_proof_url: paymentProofUrl,
         billing_same_as_shipping: formData.billing_same_as_shipping,
         billing_name: formData.billing_same_as_shipping ? null : formData.billing_name.trim(),
