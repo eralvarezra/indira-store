@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle, Upload, Image as ImageIcon } from 'lucide-react'
+import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle, Upload, Image as ImageIcon, MessageCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
 
@@ -423,10 +423,27 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
             {/* Instructions */}
             <div className="bg-gray-50 rounded-xl p-4 text-left mb-6">
-              <p className="text-sm text-gray-600 mb-2">
-                <strong>Importante:</strong> Guarda tu número de orden para dar seguimiento a tu pedido.
+              <p className="text-sm text-gray-600 mb-3">
+                <strong>¡Pedido recibido!</strong> Hemos recibido tu pedido correctamente.
               </p>
-              <p className="text-sm text-gray-600">
+              <div className="bg-white rounded-lg p-3 mb-3">
+                <p className="text-sm text-gray-600 mb-2">
+                  <strong>Para completar tu pedido, contáctanos:</strong>
+                </p>
+                <a
+                  href="https://wa.me/50686739930"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span>WhatsApp: +506 8673 9930</span>
+                </a>
+                <p className="text-sm text-gray-500 mt-2">
+                  Envíanos tu número de orden: <span className="font-mono font-bold text-gray-900">{orderConfirmation.orderNumber}</span>
+                </p>
+              </div>
+              <p className="text-xs text-gray-500">
                 Te contactaremos pronto para coordinar el {orderConfirmation.isPreOrder ? 'adelanto y ' : ''}la entrega.
               </p>
             </div>
