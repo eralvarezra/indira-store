@@ -827,11 +827,10 @@ export default function AdminDashboard() {
       const currentPaid = order?.amount_paid || 0
       const newAmountPaid = currentPaid + amount
 
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`/api/orders/${paymentOrderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: paymentOrderId,
           amount_paid: newAmountPaid,
         }),
       })
