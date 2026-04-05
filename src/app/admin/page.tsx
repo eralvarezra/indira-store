@@ -896,17 +896,19 @@ export default function AdminDashboard() {
     products.map(p => p.category).filter((c): c is string => !!c)
   )
 
+  // Get all subcategories (categories with parent_id)
+  const allSubcategories = categories.filter(c => c.parent_id)
+  const parentCategories = categories.filter(c => !c.parent_id)
+
   // Filter categories that have products (directly or through subcategories)
-  const categoriesWithProducts = categories.filter(category => {
+  const categoriesWithProducts = parentCategories.filter(category => {
     // Check if any product has this category
     if (categoryIdsWithProducts.has(category.id)) {
       return true
     }
     // Check if any subcategory has products
-    if (category.subcategories) {
-      return category.subcategories.some(sub => categoryIdsWithProducts.has(sub.id))
-    }
-    return false
+    const subs = allSubcategories.filter(s => s.parent_id === category.id)
+    return subs.some(sub => categoryIdsWithProducts.has(sub.id))
   })
 
   // Products without category
@@ -2466,16 +2468,23 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none appearance-none bg-white pr-10"
                   >
                     <option value="">Sin categoría</option>
-                    {categories.map((cat) => (
-                      <optgroup key={cat.id} label={cat.name}>
-                        <option value={cat.id}>{cat.name} (principal)</option>
-                        {cat.subcategories?.map((sub) => (
-                          <option key={sub.id} value={sub.id}>
-                            {sub.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
+                    {(() => {
+                      const parentCategories = categories.filter(c => !c.parent_id)
+                      const allSubcategories = categories.filter(c => c.parent_id)
+                      return parentCategories.map((cat) => {
+                        const subs = allSubcategories.filter(s => s.parent_id === cat.id)
+                        return (
+                          <optgroup key={cat.id} label={cat.name}>
+                            <option value={cat.id}>{cat.name}</option>
+                            {subs.map((sub) => (
+                              <option key={sub.id} value={sub.id}>
+                                &nbsp;&nbsp;- {sub.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )
+                      })
+                    })()}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 </div>
