@@ -19,7 +19,10 @@ echo "📤 Subiendo archivos..."
 scp Dockerfile $SERVER_USER@$SERVER_IP:$APP_DIR/
 scp docker-compose.yml $SERVER_USER@$SERVER_IP:$APP_DIR/
 scp .env $SERVER_USER@$SERVER_IP:$APP_DIR/
-scp -r public $SERVER_USER@$SERVER_IP:$APP_DIR/
+# Copy public folder excluding uploads (uploads are persisted via volume)
+echo "📤 Subiendo archivos públicos..."
+ssh $SERVER_USER@$SERVER_IP "mkdir -p $APP_DIR/public/uploads/payment-proofs"
+rsync -av --exclude='uploads' public/ $SERVER_USER@$SERVER_IP:$APP_DIR/public/ 2>/dev/null || scp -r public/* $SERVER_USER@$SERVER_IP:$APP_DIR/public/ 2>/dev/null || true
 scp -r src $SERVER_USER@$SERVER_IP:$APP_DIR/
 scp package.json package-lock.json $SERVER_USER@$SERVER_IP:$APP_DIR/
 scp next.config.ts tsconfig.json tailwind.config.ts postcss.config.mjs $SERVER_USER@$SERVER_IP:$APP_DIR/
