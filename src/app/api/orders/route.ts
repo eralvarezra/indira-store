@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
-import { getOrders, createOrder, getCurrentWeekCycle } from '@/lib/demo-store'
-import { OrderItem } from '@/types/database.types'
+import { getOrders, createOrder } from '@/lib/demo-store'
+import { OrderItem, SHIPPING_METHODS, ShippingMethodKey } from '@/types/database.types'
 
 interface OrderRequest {
   customer_name: string
   phone: string
+  email?: string | null
   items: OrderItem[]
   total: number
+  // Shipping fields
+  province?: string | null
+  canton?: string | null
+  district?: string | null
+  exact_address?: string | null
+  shipping_method: ShippingMethodKey
+  shipping_cost: number
+  // Payment fields
+  payment_method?: string | null
+  // Billing fields
+  billing_same_as_shipping: boolean
+  billing_name?: string | null
+  billing_province?: string | null
+  billing_canton?: string | null
+  billing_district?: string | null
+  billing_exact_address?: string | null
 }
 
 export async function GET() {
@@ -52,6 +69,24 @@ export async function POST(request: NextRequest) {
     if (cleanPhone.length < 8) {
       return NextResponse.json(
         { error: 'Invalid phone number - must have at least 8 digits' },
+        { status: 400 }
+      )
+    }
+
+    // Validate shipping address if not pickup
+    if (body.shipping_method !== 'pickup') {
+      if (!body.province || !body.canton || !body.district || !body.exact_address) {
+        return NextResponse.json(
+          { error: 'Shipping address is required for delivery' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate payment method
+    if (!body.payment_method) {
+      return NextResponse.json(
+        { error: 'Payment method is required' },
         { status: 400 }
       )
     }
@@ -104,17 +139,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build order object with all fields
+    const orderData = {
+      customer_name: body.customer_name,
+      phone: body.phone,
+      email: body.email,
+      items: processedItems,
+      total: body.total,
+      status: 'pending',
+      week_cycle_id: weekCycleId,
+      // Shipping
+      province: body.shipping_method !== 'pickup' ? body.province : null,
+      canton: body.shipping_method !== 'pickup' ? body.canton : null,
+      district: body.shipping_method !== 'pickup' ? body.district : null,
+      exact_address: body.shipping_method !== 'pickup' ? body.exact_address : null,
+      shipping_method: body.shipping_method,
+      shipping_cost: body.shipping_cost,
+      // Payment
+      payment_method: body.payment_method,
+      // Billing
+      billing_same_as_shipping: body.billing_same_as_shipping,
+      billing_name: body.billing_same_as_shipping ? null : body.billing_name,
+      billing_province: body.billing_same_as_shipping ? null : body.billing_province,
+      billing_canton: body.billing_same_as_shipping ? null : body.billing_canton,
+      billing_district: body.billing_same_as_shipping ? null : body.billing_district,
+      billing_exact_address: body.billing_same_as_shipping ? null : body.billing_exact_address,
+    }
+
     // Insert order into database
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        customer_name: body.customer_name,
-        phone: body.phone,
-        items: processedItems,
-        total: body.total,
-        status: 'pending',
-        week_cycle_id: weekCycleId,
-      } as never)
+      .insert(orderData as never)
       .select()
       .single()
 
@@ -236,20 +291,48 @@ async function sendTelegramNotification(order: OrderRequest) {
     itemsList += formatItems(preOrderItems, '📦 Pre-order')
   }
 
+  // Get shipping method info
+  const shippingMethod = SHIPPING_METHODS[order.shipping_method]
+  const shippingInfo = order.shipping_method === 'pickup'
+    ? '📦 Recoger en tienda'
+    : `🚚 ${shippingMethod.name} - ${order.province}, ${order.canton}, ${order.district}`
+
+  // Build notification message
   const message = `
-🚨 *NEW ORDER RECEIVED!*
+🚨 *NUEVO PEDIDO RECIBIDO!*
 
-👤 *Customer:* ${order.customer_name}
-📱 *Phone:* ${order.phone}
+👤 *Cliente:* ${order.customer_name}
+📱 *Teléfono:* ${order.phone}
+${order.email ? `📧 *Email:* ${order.email}` : ''}
 
-📦 *Items:*
+📦 *Productos:*
 ${itemsList}
 
-📊 *Total Items:* ${totalItems}
-💰 *Total:* ₡${order.total.toFixed(2)} CRC
+📊 *Cantidad:* ${totalItems} artículos
+💰 *Subtotal:* ₡${order.total.toFixed(2)}
 
-${preOrderItems.length > 0 ? '⚠️ *Note:* This order contains pre-order items (out of stock)' : ''}
-⚡ *Action:* Contact customer to confirm.
+🚚 *Envío:* ${shippingInfo}
+💵 *Costo envío:* ${order.shipping_cost === 0 ? 'Gratis' : `₡${order.shipping_cost.toFixed(2)}`}
+
+💰 *TOTAL:* ₡${(order.total + order.shipping_cost).toFixed(2)}
+
+💳 *Método de pago:* ${order.payment_method || 'No especificado'}
+
+${order.shipping_method !== 'pickup' ? `
+📍 *Dirección de entrega:*
+${order.exact_address}
+${order.district}, ${order.canton}, ${order.province}
+` : ''}
+
+${!order.billing_same_as_shipping ? `
+📄 *Dirección de facturación:*
+${order.billing_name}
+${order.billing_exact_address}
+${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
+` : ''}
+
+${preOrderItems.length > 0 ? '⚠️ *Nota:* Este pedido contiene items de pre-orden (sin stock)' : ''}
+⚡ *Acción:* Contactar cliente para confirmar.
   `.trim()
 
   try {

@@ -24,6 +24,122 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC);
 
 -- =============================================
+-- PRODUCT VARIANTS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS product_variants (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    sku VARCHAR(100),
+    price DECIMAL(10, 2) NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    is_default BOOLEAN DEFAULT FALSE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_product_variants_product_id ON product_variants(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_variants_default ON product_variants(product_id, is_default);
+
+-- Trigger for updated_at on variants
+CREATE TRIGGER product_variants_updated_at
+    BEFORE UPDATE ON product_variants
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- RLS Policies for product_variants
+ALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on product_variants"
+    ON product_variants FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+CREATE POLICY "Allow service role full access on product_variants"
+    ON product_variants FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- =============================================
+-- PRODUCT IMAGES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS product_images (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    alt_text VARCHAR(255),
+    sort_order INTEGER DEFAULT 0,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_images_primary ON product_images(product_id, is_primary);
+
+-- Trigger for updated_at
+CREATE TRIGGER product_images_updated_at
+    BEFORE UPDATE ON product_images
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- RLS Policies for product_images
+ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on product_images"
+    ON product_images FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+CREATE POLICY "Allow service role full access on product_images"
+    ON product_images FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- =============================================
+-- CATEGORIES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    icon VARCHAR(50),
+    parent_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Create indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_sort_order ON categories(sort_order);
+
+-- Trigger for updated_at
+CREATE TRIGGER categories_updated_at
+    BEFORE UPDATE ON categories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- RLS Policies for categories
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on categories"
+    ON categories FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+CREATE POLICY "Allow service role full access on categories"
+    ON categories FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- =============================================
 -- WEEK CYCLES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS week_cycles (
@@ -175,6 +291,14 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percentage INTEGER DEFAUL
 
 -- Add category column if it doesn't exist (for existing databases)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'other';
+
+-- Add category_id foreign key if it doesn't exist (for existing databases)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'category_id') THEN
+        ALTER TABLE products ADD COLUMN category_id UUID REFERENCES categories(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- Add week_cycle_id column to orders if it doesn't exist (for existing databases)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS week_cycle_id UUID REFERENCES week_cycles(id);

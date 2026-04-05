@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
           <img
             src="/logo.png"
             alt="Indira Store"
-            className="h-16 w-auto mx-auto mb-4"
+            className="h-24 w-auto mx-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-gray-900">Panel de Admin</h1>
           <p className="text-gray-500 mt-1">Ingresa tu contraseña para continuar</p>

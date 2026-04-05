@@ -1,6 +1,6 @@
 'use client'
 
-import { Product } from '@/types/database.types'
+import { Product, ProductVariant, ProductWithVariants, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
 import { ShoppingCart, Plus, Minus, Clock } from 'lucide-react'
 import { useState } from 'react'
@@ -8,7 +8,7 @@ import clsx from 'clsx'
 import { ProductDetailModal } from './ProductDetailModal'
 
 interface ProductCardProps {
-  product: Product
+  product: ProductWithVariants
 }
 
 export function ProductCard({ product }: ProductCardProps) {
@@ -16,13 +16,34 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showDetail, setShowDetail] = useState(false)
 
-  const cartItem = state.items.find((item) => item.product.id === product.id)
-  const quantity = cartItem?.quantity || 0
+  // Get variants for this product
+  const variants = product.variants || []
+  const hasMultipleVariants = variants.length > 1
+
+  // Get default or first variant
+  const defaultVariant = variants.find(v => v.is_default) || variants[0]
+
+  // Calculate total quantity across all variants
+  const totalQuantity = state.items
+    .filter((item) => item.product.id === product.id)
+    .reduce((sum, item) => sum + item.quantity, 0)
+
+  // Get quantity for default variant (if no variants, use product itself)
+  const defaultVariantQuantity = defaultVariant
+    ? state.items.find((item) => getCartItemId(item) === `${product.id}-${defaultVariant.id}`)?.quantity || 0
+    : state.items.find((item) => item.product.id === product.id && !item.variant)?.quantity || 0
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation()
+
+    // If multiple variants, open detail modal
+    if (hasMultipleVariants) {
+      setShowDetail(true)
+      return
+    }
+
     setIsAdding(true)
-    addItem(product)
+    addItem(product, defaultVariant)
     setTimeout(() => setIsAdding(false), 300)
   }
 
@@ -33,13 +54,21 @@ export function ProductCard({ product }: ProductCardProps) {
     }).format(price)
   }
 
-  const isOutOfStock = product.stock <= 0
+  // Calculate effective values
+  const effectivePrice = defaultVariant ? getEffectivePrice(product, defaultVariant) : product.price
+  const effectiveStock = defaultVariant ? getEffectiveStock(product, defaultVariant) : product.stock
+  const isOutOfStock = effectiveStock <= 0
 
-  // Get discount percentage (default to 0 if not present)
-  const discountPercentage = (product as Product & { discount_percentage?: number }).discount_percentage || 0
+  // Get discount percentage
+  const discountPercentage = product.discount_percentage || 0
   const hasDiscount = discountPercentage > 0
-  const originalPrice = product.price
-  const discountedPrice = hasDiscount ? originalPrice * (1 - discountPercentage / 100) : originalPrice
+  const discountedPrice = getDiscountedPrice(effectivePrice, discountPercentage)
+
+  // Price range for products with multiple variants
+  const priceRange = hasMultipleVariants && variants.length > 0 ? {
+    min: Math.min(...variants.map(v => v.price)),
+    max: Math.max(...variants.map(v => v.price))
+  } : null
 
   return (
     <>
@@ -69,27 +98,20 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
 
-          {/* Pre-order Badge for out of stock */}
-          {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                Pre-pedido
-              </div>
+          {/* Multiple Variants Badge */}
+          {hasMultipleVariants && (
+            <div className="absolute top-2 right-2 bg-indigo-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+              {variants.length} opciones
             </div>
           )}
 
           {/* Quantity Badge */}
-          {quantity > 0 && !isOutOfStock && (
-            <div className="absolute top-2 right-2 bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-              {quantity}
-            </div>
-          )}
-
-          {/* Pre-order quantity badge */}
-          {quantity > 0 && isOutOfStock && (
-            <div className="absolute top-2 right-2 bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
-              {quantity}
+          {totalQuantity > 0 && !hasMultipleVariants && (
+            <div className={clsx(
+              "absolute top-2 right-2 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg",
+              isOutOfStock ? "bg-amber-500" : "bg-[#f6a07a]"
+            )}>
+              {totalQuantity}
             </div>
           )}
         </div>
@@ -105,31 +127,52 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* Price */}
           <div className="mb-2">
-            {hasDiscount ? (
+            {hasMultipleVariants && priceRange ? (
+              <div>
+                <span className="text-base sm:text-lg font-bold text-[#E8775A]">
+                  {formatPrice(getDiscountedPrice(priceRange.min, discountPercentage))}
+                </span>
+                {priceRange.max !== priceRange.min && (
+                  <span className="text-sm text-gray-500 ml-1">
+                    - {formatPrice(getDiscountedPrice(priceRange.max, discountPercentage))}
+                  </span>
+                )}
+              </div>
+            ) : hasDiscount ? (
               <>
                 <span className="text-xs sm:text-sm text-gray-400 line-through">
-                  {formatPrice(originalPrice)}
+                  {formatPrice(effectivePrice)}
                 </span>
-                <span className="text-base sm:text-lg font-bold text-indigo-600 ml-2">
+                <span className="text-base sm:text-lg font-bold text-[#E8775A] ml-2">
                   {formatPrice(discountedPrice)}
                 </span>
               </>
             ) : (
-              <span className="text-base sm:text-lg font-bold text-indigo-600">
-                {formatPrice(originalPrice)}
+              <span className="text-base sm:text-lg font-bold text-[#E8775A]">
+                {formatPrice(effectivePrice)}
               </span>
             )}
           </div>
 
           {/* Stock status message for out of stock */}
-          {isOutOfStock && (
+          {isOutOfStock && !hasMultipleVariants && (
             <p className="text-xs text-amber-600 mb-2">
               Entrega en ~1.5 semanas
             </p>
           )}
 
           {/* Add to cart / Quantity controls */}
-          {quantity > 0 ? (
+          {hasMultipleVariants ? (
+            <button
+              onClick={handleAdd}
+              className={clsx(
+                'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
+                'bg-[#f6a07a] text-white active:bg-[#e58e6a] active:scale-95'
+              )}
+            >
+              Ver opciones
+            </button>
+          ) : defaultVariantQuantity > 0 ? (
             <div
               className="flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()}
@@ -137,23 +180,23 @@ export function ProductCard({ product }: ProductCardProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  updateQuantity(product.id, quantity - 1)
+                  updateQuantity(product.id, defaultVariantQuantity - 1, defaultVariant?.id)
                 }}
                 className="w-9 h-9 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors touch-target"
               >
                 <Minus className="w-4 h-4 text-gray-600" />
               </button>
-              <span className="w-8 text-center font-semibold">{quantity}</span>
+              <span className="w-8 text-center font-semibold">{defaultVariantQuantity}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  addItem(product)
+                  addItem(product, defaultVariant)
                 }}
                 className={clsx(
                   "w-9 h-9 rounded-full flex items-center justify-center transition-colors touch-target",
                   isOutOfStock
                     ? "bg-amber-500 active:bg-amber-600"
-                    : "bg-indigo-600 active:bg-indigo-700"
+                    : "bg-[#f6a07a] active:bg-[#e58e6a]"
                 )}
               >
                 <Plus className="w-4 h-4 text-white" />
@@ -166,7 +209,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
                 isOutOfStock
                   ? 'bg-amber-500 text-white active:bg-amber-600 active:scale-95'
-                  : 'bg-indigo-600 text-white active:bg-indigo-700 active:scale-95',
+                  : 'bg-[#f6a07a] text-white active:bg-[#e58e6a] active:scale-95',
                 isAdding && 'scale-105'
               )}
             >

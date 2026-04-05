@@ -1,18 +1,16 @@
-// Skincare product categories
-export const SKINCARE_CATEGORIES = [
-  { id: 'cleansers', name: 'Limpiadores', icon: '🧼' },
-  { id: 'toners', name: 'Tónicos', icon: '💧' },
-  { id: 'serums', name: 'Sérums', icon: '✨' },
-  { id: 'moisturizers', name: 'Hidratantes', icon: '🧴' },
-  { id: 'sunscreen', name: 'Protectores Solares', icon: '☀️' },
-  { id: 'masks', name: 'Mascarillas', icon: '🎭' },
-  { id: 'exfoliants', name: 'Exfoliantes', icon: '🌿' },
-  { id: 'oils', name: 'Aceites', icon: '🫒' },
-  { id: 'treatments', name: 'Tratamientos', icon: '💊' },
-  { id: 'eye-care', name: 'Contorno de Ojos', icon: '👁️' },
-] as const
-
-export type CategoryId = typeof SKINCARE_CATEGORIES[number]['id']
+// Category type with subcategories
+export interface Category {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  parent_id: string | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  subcategories?: Category[]
+}
 
 export type Json =
   | string
@@ -35,6 +33,7 @@ export interface Database {
           stock: number
           discount_percentage: number
           category: string
+          category_id: string | null
           created_at: string
         }
         Insert: {
@@ -46,6 +45,7 @@ export interface Database {
           stock?: number
           discount_percentage?: number
           category?: string
+          category_id?: string | null
           created_at?: string
         }
         Update: {
@@ -57,7 +57,43 @@ export interface Database {
           stock?: number
           discount_percentage?: number
           category?: string
+          category_id?: string | null
           created_at?: string
+        }
+      }
+      categories: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          icon: string | null
+          parent_id: string | null
+          sort_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          icon?: string | null
+          parent_id?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          icon?: string | null
+          parent_id?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
       orders: {
@@ -65,31 +101,114 @@ export interface Database {
           id: string
           customer_name: string
           phone: string
+          email: string | null
           items: Json
           total: number
           status: string
           week_cycle_id: string | null
+          // Shipping fields
+          province: string | null
+          canton: string | null
+          district: string | null
+          exact_address: string | null
+          shipping_method: string
+          shipping_cost: number
+          // Payment fields
+          payment_method: string | null
+          payment_details: Json | null
+          // Billing fields
+          billing_same_as_shipping: boolean
+          billing_name: string | null
+          billing_province: string | null
+          billing_canton: string | null
+          billing_district: string | null
+          billing_exact_address: string | null
           created_at: string
         }
         Insert: {
           id?: string
           customer_name: string
           phone: string
+          email?: string | null
           items: Json
           total: number
           status?: string
           week_cycle_id?: string | null
+          province?: string | null
+          canton?: string | null
+          district?: string | null
+          exact_address?: string | null
+          shipping_method?: string
+          shipping_cost?: number
+          payment_method?: string | null
+          payment_details?: Json | null
+          billing_same_as_shipping?: boolean
+          billing_name?: string | null
+          billing_province?: string | null
+          billing_canton?: string | null
+          billing_district?: string | null
+          billing_exact_address?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           customer_name?: string
           phone?: string
+          email?: string | null
           items?: Json
           total?: number
           status?: string
           week_cycle_id?: string | null
+          province?: string | null
+          canton?: string | null
+          district?: string | null
+          exact_address?: string | null
+          shipping_method?: string
+          shipping_cost?: number
+          payment_method?: string | null
+          payment_details?: Json | null
+          billing_same_as_shipping?: boolean
+          billing_name?: string | null
+          billing_province?: string | null
+          billing_canton?: string | null
+          billing_district?: string | null
+          billing_exact_address?: string | null
           created_at?: string
+        }
+      }
+      payment_methods: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          instructions: string | null
+          account_info: string | null
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          instructions?: string | null
+          account_info?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          instructions?: string | null
+          account_info?: string | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
         }
       }
       week_cycles: {
@@ -149,18 +268,118 @@ export interface Database {
 }
 
 export type Product = Database['public']['Tables']['products']['Row']
+export type CategoryDB = Database['public']['Tables']['categories']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type WeekCycle = Database['public']['Tables']['week_cycles']['Row']
 export type Setting = Database['public']['Tables']['settings']['Row']
+export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row']
+
+// Costa Rica Provinces
+export const COSTA_RICA_PROVINCES = [
+  'San José',
+  'Alajuela',
+  'Cartago',
+  'Heredia',
+  'Guanacaste',
+  'Puntarenas',
+  'Limón'
+] as const
+
+export type CostaRicaProvince = typeof COSTA_RICA_PROVINCES[number]
+
+// Shipping methods
+export const SHIPPING_METHODS = {
+  pickup: {
+    name: 'Recoger en tienda',
+    description: 'Recoge tu pedido sin costo adicional',
+    price: 0
+  },
+  gam: {
+    name: 'Correos de Costa Rica - Dentro del GAM',
+    description: 'Entrega en 2-3 días hábiles dentro del Gran Área Metropolitana',
+    price: 2500
+  },
+  outside_gam: {
+    name: 'Correos de Costa Rica - Fuera del GAM',
+    description: 'Entrega en 3-5 días hábiles fuera del Gran Área Metropolitana',
+    price: 3500
+  }
+} as const
+
+export type ShippingMethodKey = keyof typeof SHIPPING_METHODS
+
+// Checkout form data
+export interface CheckoutFormData {
+  // Contact
+  customer_name: string
+  phone: string
+  country_code: string
+  email: string
+  // Shipping
+  province: string
+  canton: string
+  district: string
+  exact_address: string
+  shipping_method: ShippingMethodKey
+  // Payment
+  payment_method: string
+  // Billing
+  billing_same_as_shipping: boolean
+  billing_name: string
+  billing_province: string
+  billing_canton: string
+  billing_district: string
+  billing_exact_address: string
+}
+
+// Product Variant type
+export interface ProductVariant {
+  id: string
+  product_id: string
+  name: string
+  sku: string | null
+  price: number
+  stock: number
+  is_default: boolean
+  sort_order: number
+  created_at: string
+}
+
+// Product Image type
+export interface ProductImage {
+  id: string
+  product_id: string
+  image_url: string
+  alt_text: string | null
+  sort_order: number
+  is_primary: boolean
+  created_at: string
+}
+
+// Product with variants and images
+export interface ProductWithVariants extends Product {
+  variants: ProductVariant[]
+  images?: ProductImage[]
+}
 
 export interface CartItem {
   product: Product
+  variant?: ProductVariant
   quantity: number
+}
+
+// Helper to get unique cart item ID
+export function getCartItemId(item: CartItem): string {
+  return item.variant
+    ? `${item.product.id}-${item.variant.id}`
+    : item.product.id
 }
 
 // Order item type - includes whether it's in_stock or pre_order
 export interface OrderItem {
   product_id: string
+  variant_id: string | null
+  variant_name: string | null
   name: string
   price: number
   quantity: number
@@ -182,12 +401,23 @@ export function formatPriceWithDiscount(price: number, discountPercentage: numbe
   }
 }
 
-// Helper to get category info
-export function getCategoryInfo(categoryId: string) {
-  return SKINCARE_CATEGORIES.find(c => c.id === categoryId) || null
-}
-
 // Helper to determine order item type based on stock
 export function getOrderItemType(stock: number): 'in_stock' | 'pre_order' {
   return stock > 0 ? 'in_stock' : 'pre_order'
+}
+
+// Helper to get effective price (variant or product)
+export function getEffectivePrice(product: Product, variant?: ProductVariant): number {
+  if (variant) {
+    return variant.price
+  }
+  return product.price
+}
+
+// Helper to get effective stock (variant or product)
+export function getEffectiveStock(product: Product, variant?: ProductVariant): number {
+  if (variant) {
+    return variant.stock
+  }
+  return product.stock
 }

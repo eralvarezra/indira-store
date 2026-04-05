@@ -6,12 +6,12 @@ import { ProductCard } from '@/components/product/ProductCard'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { FloatingCartButton } from '@/components/cart/FloatingCartButton'
 import { CheckoutModal } from '@/components/checkout/CheckoutModal'
-import { Product, Category } from '@/types/database.types'
-import { ShoppingBag, Loader2, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { Product, Category, ProductWithVariants } from '@/types/database.types'
+import { ShoppingBag, Loader2, Search, ChevronDown, ChevronRight, Percent } from 'lucide-react'
 import clsx from 'clsx'
 
 function CatalogContent() {
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<ProductWithVariants[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -60,6 +60,9 @@ function CatalogContent() {
     products.map(p => p.category).filter((c): c is string => !!c)
   )
 
+  // Get products with discount (promotions)
+  const productsWithDiscount = products.filter(p => (p.discount_percentage || 0) > 0)
+
   // Filter categories that have products (directly or through subcategories)
   const categoriesWithProducts = categories.filter(category => {
     if (categoryIdsWithProducts.has(category.id)) {
@@ -71,6 +74,24 @@ function CatalogContent() {
     return false
   })
 
+  // Create virtual "Promociones" category if there are discounted products
+  const promocionesCategory: Category = {
+    id: 'promociones',
+    name: 'Promociones',
+    slug: 'promociones',
+    icon: '🏷️',
+    parent_id: null,
+    sort_order: -1, // Always first
+    is_active: true,
+    created_at: '',
+    updated_at: ''
+  }
+
+  // Add promociones category at the beginning if there are discounted products
+  const allCategories = productsWithDiscount.length > 0
+    ? [promocionesCategory, ...categoriesWithProducts]
+    : categoriesWithProducts
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,15 +99,20 @@ function CatalogContent() {
 
     let matchesCategory = true
     if (selectedMainCategory !== 'all') {
-      const mainCategory = categoriesWithProducts.find(c => c.id === selectedMainCategory)
-      const subcategoryIds = mainCategory?.subcategories?.map(s => s.id) || []
-
-      if (selectedSubcategory !== 'all') {
-        matchesCategory = product.category_id === selectedSubcategory || product.category === selectedSubcategory
+      // Special case for "Promociones" category
+      if (selectedMainCategory === 'promociones') {
+        matchesCategory = (product.discount_percentage || 0) > 0
       } else {
-        matchesCategory = product.category_id === selectedMainCategory ||
-                          subcategoryIds.includes(product.category_id || '') ||
-                          product.category === selectedMainCategory
+        const mainCategory = categoriesWithProducts.find(c => c.id === selectedMainCategory)
+        const subcategoryIds = mainCategory?.subcategories?.map(s => s.id) || []
+
+        if (selectedSubcategory !== 'all') {
+          matchesCategory = product.category_id === selectedSubcategory || product.category === selectedSubcategory
+        } else {
+          matchesCategory = product.category_id === selectedMainCategory ||
+                            subcategoryIds.includes(product.category_id || '') ||
+                            product.category === selectedMainCategory
+        }
       }
     }
 
@@ -124,7 +150,7 @@ function CatalogContent() {
         </div>
 
         {/* Categories */}
-        {!isLoading && categoriesWithProducts.length > 0 && (
+        {!isLoading && allCategories.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3">
             {/* Main Categories */}
             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
@@ -142,9 +168,15 @@ function CatalogContent() {
               >
                 Todos ({productsCount})
               </button>
-              {categoriesWithProducts.map((category) => {
+              {allCategories.map((category) => {
                 const isExpanded = expandedCategories.has(category.id)
                 const isSelected = selectedMainCategory === category.id
+                const isPromociones = category.id === 'promociones'
+                // For Promociones, count products with discount
+                const categoryCount = isPromociones
+                  ? productsWithDiscount.length
+                  : (category.subcategories?.filter(sub => categoryIdsWithProducts.has(sub.id)).length || 0) +
+                    (categoryIdsWithProducts.has(category.id) ? 1 : 0)
                 // Filter subcategories to only show those with products
                 const subcategoriesWithProducts = category.subcategories?.filter(sub =>
                   categoryIdsWithProducts.has(sub.id)
@@ -156,18 +188,21 @@ function CatalogContent() {
                       onClick={() => {
                         setSelectedMainCategory(category.id)
                         setSelectedSubcategory('all')
-                        toggleCategory(category.id)
+                        if (!isPromociones) {
+                          toggleCategory(category.id)
+                        }
                       }}
                       className={clsx(
                         'flex items-center gap-1 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-target',
                         isSelected
-                          ? 'bg-[#f6a07a] text-white'
-                          : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                          ? (isPromociones ? 'bg-red-500 text-white' : 'bg-[#f6a07a] text-white')
+                          : (isPromociones ? 'bg-red-100 text-red-700 active:bg-red-200' : 'bg-gray-100 text-gray-700 active:bg-gray-200')
                       )}
                     >
-                      {category.icon && <span>{category.icon}</span>}
+                      {isPromociones && <Percent className="w-4 h-4" />}
+                      {!isPromociones && category.icon && <span>{category.icon}</span>}
                       {category.name}
-                      {subcategoriesWithProducts.length > 0 && (
+                      {!isPromociones && subcategoriesWithProducts.length > 0 && (
                         isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
                       )}
                     </button>
@@ -177,7 +212,7 @@ function CatalogContent() {
             </div>
 
             {/* Subcategories */}
-            {selectedMainCategory !== 'all' && (() => {
+            {selectedMainCategory !== 'all' && selectedMainCategory !== 'promociones' && (() => {
               const selectedCat = categoriesWithProducts.find(c => c.id === selectedMainCategory)
               const subcats = selectedCat?.subcategories?.filter(sub =>
                 categoryIdsWithProducts.has(sub.id)
@@ -263,8 +298,10 @@ function CatalogContent() {
                   {selectedMainCategory !== 'all' && (
                     <span className="text-[#E8775A]">
                       {' '}
-                      en {categoriesWithProducts.find(c => c.id === selectedMainCategory)?.name}
-                      {selectedSubcategory !== 'all' && (
+                      {selectedMainCategory === 'promociones'
+                        ? 'en Promociones'
+                        : `en ${categoriesWithProducts.find(c => c.id === selectedMainCategory)?.name}`}
+                      {selectedSubcategory !== 'all' && selectedMainCategory !== 'promociones' && (
                         <> / {categoriesWithProducts.find(c => c.id === selectedMainCategory)?.subcategories?.find(s => s.id === selectedSubcategory)?.name}</>
                       )}
                     </span>

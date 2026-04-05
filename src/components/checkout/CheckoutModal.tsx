@@ -1,51 +1,92 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock } from 'lucide-react'
+import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home } from 'lucide-react'
 import clsx from 'clsx'
-import { OrderItem } from '@/types/database.types'
+import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
 
 interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-interface FormData {
-  customer_name: string
-  phone: string
-  country_code: string
-}
-
 interface FormErrors {
   customer_name?: string
   phone?: string
-  country_code?: string
+  email?: string
+  province?: string
+  canton?: string
+  district?: string
+  exact_address?: string
+  payment_method?: string
+  billing_name?: string
+  billing_province?: string
+  billing_canton?: string
+  billing_district?: string
+  billing_exact_address?: string
 }
 
 const countries = [
   { code: 'CR', name: 'Costa Rica', digits: 8, prefix: '+506', placeholder: '8888 8888' },
   { code: 'MX', name: 'México', digits: 10, prefix: '+52', placeholder: '55 1234 5678' },
   { code: 'US', name: 'Estados Unidos', digits: 10, prefix: '+1', placeholder: '(555) 123-4567' },
-  { code: 'CO', name: 'Colombia', digits: 10, prefix: '+57', placeholder: '321 456 7890' },
-  { code: 'AR', name: 'Argentina', digits: 10, prefix: '+54', placeholder: '11 1234-5678' },
-  { code: 'PE', name: 'Perú', digits: 9, prefix: '+51', placeholder: '987 654 321' },
-  { code: 'ES', name: 'España', digits: 9, prefix: '+34', placeholder: '612 345 678' },
   { code: 'OTHER', name: 'Otro país', digits: 0, prefix: '', placeholder: 'Número completo' },
 ]
 
 export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { state, clearCart, totalPrice, totalItems } = useCart()
-  const [formData, setFormData] = useState<FormData>({
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(true)
+
+  const [formData, setFormData] = useState<CheckoutFormData>({
     customer_name: '',
     phone: '',
     country_code: 'CR',
+    email: '',
+    province: '',
+    canton: '',
+    district: '',
+    exact_address: '',
+    shipping_method: 'pickup',
+    payment_method: '',
+    billing_same_as_shipping: true,
+    billing_name: '',
+    billing_province: '',
+    billing_canton: '',
+    billing_district: '',
+    billing_exact_address: '',
   })
+
   const [errors, setErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
 
   const selectedCountry = countries.find(c => c.code === formData.country_code) || countries[0]
+  const selectedShipping = SHIPPING_METHODS[formData.shipping_method]
+  const shippingCost = selectedShipping.price
+  const totalWithShipping = totalPrice + shippingCost
+
+  // Fetch payment methods on mount
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const response = await fetch('/api/payment-methods')
+        if (response.ok) {
+          const data = await response.json()
+          setPaymentMethods(data.paymentMethods || [])
+        }
+      } catch (error) {
+        console.error('Error fetching payment methods:', error)
+      } finally {
+        setIsLoadingPaymentMethods(false)
+      }
+    }
+
+    if (isOpen) {
+      fetchPaymentMethods()
+    }
+  }, [isOpen])
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CR', {
@@ -55,14 +96,19 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   }
 
   // Separate items into in_stock and pre_order
-  const inStockItems = state.items.filter(item => item.product.stock > 0)
-  const preOrderItems = state.items.filter(item => item.product.stock === 0)
+  const inStockItems = state.items.filter(item => {
+    const stock = getEffectiveStock(item.product, item.variant)
+    return stock > 0
+  })
+  const preOrderItems = state.items.filter(item => {
+    const stock = getEffectiveStock(item.product, item.variant)
+    return stock <= 0
+  })
 
   const validatePhone = (phone: string, countryCode: string) => {
     const country = countries.find(c => c.code === countryCode)
     if (!country) return phone.length >= 8
 
-    // If "Other country", just check minimum length
     if (country.digits === 0) {
       return phone.replace(/\D/g, '').length >= 8
     }
@@ -71,9 +117,16 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     return cleanPhone.length === country.digits
   }
 
+  const validateEmail = (email: string) => {
+    if (!email) return true // Optional field
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
   const validateForm = () => {
     const newErrors: FormErrors = {}
 
+    // Contact validation
     if (!formData.customer_name.trim()) {
       newErrors.customer_name = 'El nombre es requerido'
     } else if (formData.customer_name.trim().length < 2) {
@@ -88,6 +141,50 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         newErrors.phone = `Ingresa ${country.digits} dígitos para ${country.name}`
       } else {
         newErrors.phone = 'Ingresa un número de teléfono válido'
+      }
+    }
+
+    if (formData.email && !validateEmail(formData.email)) {
+      newErrors.email = 'Ingresa un correo electrónico válido'
+    }
+
+    // Shipping validation (only if not pickup)
+    if (formData.shipping_method !== 'pickup') {
+      if (!formData.province) {
+        newErrors.province = 'Selecciona una provincia'
+      }
+      if (!formData.canton.trim()) {
+        newErrors.canton = 'El cantón es requerido'
+      }
+      if (!formData.district.trim()) {
+        newErrors.district = 'El distrito es requerido'
+      }
+      if (!formData.exact_address.trim()) {
+        newErrors.exact_address = 'La dirección exacta es requerida'
+      }
+    }
+
+    // Payment validation
+    if (!formData.payment_method) {
+      newErrors.payment_method = 'Selecciona un método de pago'
+    }
+
+    // Billing validation (only if different from shipping)
+    if (!formData.billing_same_as_shipping) {
+      if (!formData.billing_name.trim()) {
+        newErrors.billing_name = 'El nombre de facturación es requerido'
+      }
+      if (!formData.billing_province) {
+        newErrors.billing_province = 'Selecciona una provincia'
+      }
+      if (!formData.billing_canton.trim()) {
+        newErrors.billing_canton = 'El cantón es requerido'
+      }
+      if (!formData.billing_district.trim()) {
+        newErrors.billing_district = 'El distrito es requerido'
+      }
+      if (!formData.billing_exact_address.trim()) {
+        newErrors.billing_exact_address = 'La dirección es requerida'
       }
     }
 
@@ -112,19 +209,40 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       const fullPhone = selectedCountry.prefix ? `${selectedCountry.prefix} ${cleanPhone}` : cleanPhone
 
       // Build order items with proper type based on stock
-      const orderItems: OrderItem[] = state.items.map((item) => ({
-        product_id: item.product.id,
-        name: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-        type: item.product.stock > 0 ? 'in_stock' : 'pre_order' as const
-      }))
+      const orderItems: OrderItem[] = state.items.map((item) => {
+        const effectivePrice = getEffectivePrice(item.product, item.variant)
+        const effectiveStock = getEffectiveStock(item.product, item.variant)
+
+        return {
+          product_id: item.product.id,
+          variant_id: item.variant?.id || null,
+          variant_name: item.variant?.name || null,
+          name: item.product.name,
+          price: getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0),
+          quantity: item.quantity,
+          type: effectiveStock > 0 ? 'in_stock' : 'pre_order' as const
+        }
+      })
 
       const orderData = {
         customer_name: formData.customer_name.trim(),
         phone: fullPhone,
+        email: formData.email.trim() || null,
         items: orderItems,
-        total: totalPrice,
+        total: totalWithShipping,
+        province: formData.shipping_method !== 'pickup' ? formData.province : null,
+        canton: formData.shipping_method !== 'pickup' ? formData.canton.trim() : null,
+        district: formData.shipping_method !== 'pickup' ? formData.district.trim() : null,
+        exact_address: formData.shipping_method !== 'pickup' ? formData.exact_address.trim() : null,
+        shipping_method: formData.shipping_method,
+        shipping_cost: shippingCost,
+        payment_method: formData.payment_method,
+        billing_same_as_shipping: formData.billing_same_as_shipping,
+        billing_name: formData.billing_same_as_shipping ? null : formData.billing_name.trim(),
+        billing_province: formData.billing_same_as_shipping ? null : formData.billing_province,
+        billing_canton: formData.billing_same_as_shipping ? null : formData.billing_canton.trim(),
+        billing_district: formData.billing_same_as_shipping ? null : formData.billing_district.trim(),
+        billing_exact_address: formData.billing_same_as_shipping ? null : formData.billing_exact_address.trim(),
       }
 
       const response = await fetch('/api/orders', {
@@ -144,7 +262,24 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
       setTimeout(() => {
         setIsSuccess(false)
-        setFormData({ customer_name: '', phone: '', country_code: 'CR' })
+        setFormData({
+          customer_name: '',
+          phone: '',
+          country_code: 'CR',
+          email: '',
+          province: '',
+          canton: '',
+          district: '',
+          exact_address: '',
+          shipping_method: 'pickup',
+          payment_method: '',
+          billing_same_as_shipping: true,
+          billing_name: '',
+          billing_province: '',
+          billing_canton: '',
+          billing_district: '',
+          billing_exact_address: '',
+        })
         onClose()
       }, 3000)
     } catch (error) {
@@ -155,9 +290,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     }
   }
 
-  const handleInputChange = (field: keyof FormData, value: string) => {
+  const handleInputChange = <K extends keyof CheckoutFormData>(field: K, value: CheckoutFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
+    if (errors[field as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }))
     }
   }
@@ -172,8 +307,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         onClick={onClose}
       />
 
-      {/* Modal - Bottom sheet on mobile */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden animate-in fade-in slide-up duration-200">
+      {/* Modal - Bottom sheet on mobile, larger for checkout */}
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95vh] overflow-hidden animate-in fade-in slide-up duration-200">
         {/* Drag handle for mobile */}
         <div className="flex justify-center pt-3 sm:hidden">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
@@ -194,10 +329,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         ) : (
           <>
             {/* Header */}
-            <div className="border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-lg font-bold text-gray-900">Confirmar Pedido</h2>
+                <h2 className="text-lg font-bold text-gray-900">Finalizar Compra</h2>
               </div>
               <button
                 onClick={onClose}
@@ -209,14 +344,12 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
             {/* Order Summary */}
             <div className="px-4 sm:px-6 py-3 bg-gray-50 border-b border-gray-100">
-              {/* In-stock items */}
               {inStockItems.length > 0 && (
                 <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
                   <Package className="w-4 h-4 text-green-600" />
                   <span>Disponibles ({inStockItems.reduce((sum, i) => sum + i.quantity, 0)})</span>
                 </div>
               )}
-              {/* Pre-order items */}
               {preOrderItems.length > 0 && (
                 <div className="flex items-center gap-2 text-sm text-amber-600 mb-1">
                   <Clock className="w-4 h-4" />
@@ -224,124 +357,516 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </div>
               )}
               <div className="flex justify-between font-bold text-gray-900 mt-2">
-                <span>Total a pagar</span>
+                <span>Subtotal</span>
                 <span className="text-indigo-600">{formatPrice(totalPrice)}</span>
               </div>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto scroll-container" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-              {/* Name Input */}
-              <div>
-                <label
-                  htmlFor="customer_name"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  id="customer_name"
-                  value={formData.customer_name}
-                  onChange={(e) => handleInputChange('customer_name', e.target.value)}
-                  className={clsx(
-                    'w-full px-4 py-3.5 rounded-xl border-2 transition-colors outline-none text-base',
-                    errors.customer_name
-                      ? 'border-red-300 focus:border-red-500'
-                      : 'border-gray-200 focus:border-indigo-500'
-                  )}
-                  placeholder="Tu nombre"
-                  autoComplete="name"
-                />
-                {errors.customer_name && (
-                  <p className="mt-1 text-sm text-red-500">{errors.customer_name}</p>
-                )}
-              </div>
+            <form onSubmit={handleSubmit} className="overflow-y-auto scroll-container" style={{ maxHeight: 'calc(95vh - 180px)' }}>
+              <div className="p-4 sm:p-6 space-y-6">
 
-              {/* Country Selector */}
-              <div>
-                <label
-                  htmlFor="country_code"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  País
-                </label>
-                <div className="relative">
-                  <select
-                    id="country_code"
-                    value={formData.country_code}
-                    onChange={(e) => handleInputChange('country_code', e.target.value)}
-                    className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-10 text-base"
-                  >
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>
-                        {country.name} {country.prefix && `(${country.prefix})`}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
+                {/* Contact Section */}
+                <section>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Información de Contacto
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Name */}
+                    <div>
+                      <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre completo *
+                      </label>
+                      <input
+                        type="text"
+                        id="customer_name"
+                        value={formData.customer_name}
+                        onChange={(e) => handleInputChange('customer_name', e.target.value)}
+                        className={clsx(
+                          'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                          errors.customer_name
+                            ? 'border-red-300 focus:border-red-500'
+                            : 'border-gray-200 focus:border-indigo-500'
+                        )}
+                        placeholder="Tu nombre"
+                        autoComplete="name"
+                      />
+                      {errors.customer_name && (
+                        <p className="mt-1 text-sm text-red-500">{errors.customer_name}</p>
+                      )}
+                    </div>
 
-              {/* Phone Input */}
-              <div>
-                <label
-                  htmlFor="phone"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Teléfono {selectedCountry.digits > 0 && `(${selectedCountry.digits} dígitos)`}
-                </label>
-                <div className="flex gap-2">
-                  {selectedCountry.prefix && (
-                    <div className="flex items-center px-4 py-3.5 bg-gray-100 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-base">
-                      {selectedCountry.prefix}
+                    {/* Country and Phone */}
+                    <div className="flex gap-2">
+                      <div className="w-32">
+                        <label htmlFor="country_code" className="block text-sm font-medium text-gray-700 mb-1">
+                          País
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="country_code"
+                            value={formData.country_code}
+                            onChange={(e) => handleInputChange('country_code', e.target.value)}
+                            className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none appearance-none bg-white pr-8 text-sm"
+                          >
+                            {countries.map((country) => (
+                              <option key={country.code} value={country.code}>
+                                {country.code}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                          Teléfono *
+                        </label>
+                        <div className="flex gap-2">
+                          {selectedCountry.prefix && (
+                            <div className="flex items-center px-3 py-3 bg-gray-100 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-sm">
+                              {selectedCountry.prefix}
+                            </div>
+                          )}
+                          <input
+                            type="tel"
+                            id="phone"
+                            value={formData.phone}
+                            onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
+                            className={clsx(
+                              'flex-1 px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                              errors.phone
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                            placeholder={selectedCountry.placeholder}
+                            maxLength={selectedCountry.digits > 0 ? selectedCountry.digits : 15}
+                            autoComplete="tel"
+                          />
+                        </div>
+                        {errors.phone && (
+                          <p className="mt-1 text-sm text-red-500">{errors.phone}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                        Correo electrónico (opcional)
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="email"
+                          id="email"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          className={clsx(
+                            'w-full pl-10 pr-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                            errors.email
+                              ? 'border-red-300 focus:border-red-500'
+                              : 'border-gray-200 focus:border-indigo-500'
+                          )}
+                          placeholder="tu@email.com"
+                          autoComplete="email"
+                        />
+                      </div>
+                      {errors.email && (
+                        <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Shipping Section */}
+                <section>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Truck className="w-4 h-4" />
+                    Método de Envío
+                  </h3>
+
+                  {/* Shipping Method Selection */}
+                  <div className="space-y-2 mb-4">
+                    {(Object.keys(SHIPPING_METHODS) as ShippingMethodKey[]).map((key) => {
+                      const method = SHIPPING_METHODS[key]
+                      const isSelected = formData.shipping_method === key
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleInputChange('shipping_method', key)}
+                          className={clsx(
+                            'w-full p-3 rounded-xl border-2 text-left transition-all',
+                            isSelected
+                              ? 'border-indigo-500 bg-indigo-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          )}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-gray-900">{method.name}</p>
+                              <p className="text-sm text-gray-500">{method.description}</p>
+                            </div>
+                            <span className={clsx(
+                              'font-semibold',
+                              method.price === 0 ? 'text-green-600' : 'text-gray-900'
+                            )}>
+                              {method.price === 0 ? 'Gratis' : formatPrice(method.price)}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Shipping Address (only if not pickup) */}
+                  {formData.shipping_method !== 'pickup' && (
+                    <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
+                      <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Dirección de Entrega
+                      </h4>
+
+                      {/* Province Dropdown */}
+                      <div>
+                        <label htmlFor="province" className="block text-sm font-medium text-gray-700 mb-1">
+                          Provincia *
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="province"
+                            value={formData.province}
+                            onChange={(e) => handleInputChange('province', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 outline-none appearance-none bg-white pr-10',
+                              errors.province
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                          >
+                            <option value="">Seleccionar provincia</option>
+                            {COSTA_RICA_PROVINCES.map((province) => (
+                              <option key={province} value={province}>
+                                {province}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                        </div>
+                        {errors.province && (
+                          <p className="mt-1 text-sm text-red-500">{errors.province}</p>
+                        )}
+                      </div>
+
+                      {/* Canton and District */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="canton" className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantón *
+                          </label>
+                          <input
+                            type="text"
+                            id="canton"
+                            value={formData.canton}
+                            onChange={(e) => handleInputChange('canton', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                              errors.canton
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                            placeholder="Ej: San José"
+                          />
+                          {errors.canton && (
+                            <p className="mt-1 text-sm text-red-500">{errors.canton}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label htmlFor="district" className="block text-sm font-medium text-gray-700 mb-1">
+                            Distrito *
+                          </label>
+                          <input
+                            type="text"
+                            id="district"
+                            value={formData.district}
+                            onChange={(e) => handleInputChange('district', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                              errors.district
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                            placeholder="Ej: Carmen"
+                          />
+                          {errors.district && (
+                            <p className="mt-1 text-sm text-red-500">{errors.district}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Exact Address */}
+                      <div>
+                        <label htmlFor="exact_address" className="block text-sm font-medium text-gray-700 mb-1">
+                          Dirección exacta *
+                        </label>
+                        <textarea
+                          id="exact_address"
+                          value={formData.exact_address}
+                          onChange={(e) => handleInputChange('exact_address', e.target.value)}
+                          rows={2}
+                          className={clsx(
+                            'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base resize-none',
+                            errors.exact_address
+                              ? 'border-red-300 focus:border-red-500'
+                              : 'border-gray-200 focus:border-indigo-500'
+                          )}
+                          placeholder="Casa, calle, puntos de referencia..."
+                        />
+                        {errors.exact_address && (
+                          <p className="mt-1 text-sm text-red-500">{errors.exact_address}</p>
+                        )}
+                      </div>
                     </div>
                   )}
-                  <input
-                    type="tel"
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
-                    className={clsx(
-                      'flex-1 px-4 py-3.5 rounded-xl border-2 transition-colors outline-none text-base',
-                      errors.phone
-                        ? 'border-red-300 focus:border-red-500'
-                        : 'border-gray-200 focus:border-indigo-500'
-                    )}
-                    placeholder={selectedCountry.placeholder}
-                    maxLength={selectedCountry.digits > 0 ? selectedCountry.digits : 15}
-                    autoComplete="tel"
-                  />
+                </section>
+
+                {/* Payment Section */}
+                <section>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Método de Pago
+                  </h3>
+
+                  {isLoadingPaymentMethods ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {paymentMethods.map((method) => {
+                        const isSelected = formData.payment_method === method.id
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => handleInputChange('payment_method', method.id)}
+                            className={clsx(
+                              'w-full p-3 rounded-xl border-2 text-left transition-all',
+                              isSelected
+                                ? 'border-indigo-500 bg-indigo-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            )}
+                          >
+                            <p className="font-medium text-gray-900">{method.name}</p>
+                            {method.description && (
+                              <p className="text-sm text-gray-500">{method.description}</p>
+                            )}
+                          </button>
+                        )
+                      })}
+
+                      {paymentMethods.length === 0 && (
+                        <p className="text-sm text-gray-500 py-2">
+                          No hay métodos de pago disponibles
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {errors.payment_method && (
+                    <p className="mt-1 text-sm text-red-500">{errors.payment_method}</p>
+                  )}
+                </section>
+
+                {/* Billing Address Section */}
+                <section>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    Dirección de Facturación
+                  </h3>
+
+                  <label className="flex items-center gap-2 cursor-pointer mb-3">
+                    <input
+                      type="checkbox"
+                      checked={formData.billing_same_as_shipping}
+                      onChange={(e) => handleInputChange('billing_same_as_shipping', e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700">Usar misma dirección de envío</span>
+                  </label>
+
+                  {!formData.billing_same_as_shipping && (
+                    <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
+                      {/* Billing Name */}
+                      <div>
+                        <label htmlFor="billing_name" className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre para facturación *
+                        </label>
+                        <input
+                          type="text"
+                          id="billing_name"
+                          value={formData.billing_name}
+                          onChange={(e) => handleInputChange('billing_name', e.target.value)}
+                          className={clsx(
+                            'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                            errors.billing_name
+                              ? 'border-red-300 focus:border-red-500'
+                              : 'border-gray-200 focus:border-indigo-500'
+                          )}
+                          placeholder="Nombre completo"
+                        />
+                        {errors.billing_name && (
+                          <p className="mt-1 text-sm text-red-500">{errors.billing_name}</p>
+                        )}
+                      </div>
+
+                      {/* Billing Province */}
+                      <div>
+                        <label htmlFor="billing_province" className="block text-sm font-medium text-gray-700 mb-1">
+                          Provincia *
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="billing_province"
+                            value={formData.billing_province}
+                            onChange={(e) => handleInputChange('billing_province', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 outline-none appearance-none bg-white pr-10',
+                              errors.billing_province
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                          >
+                            <option value="">Seleccionar provincia</option>
+                            {COSTA_RICA_PROVINCES.map((province) => (
+                              <option key={province} value={province}>
+                                {province}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                        </div>
+                        {errors.billing_province && (
+                          <p className="mt-1 text-sm text-red-500">{errors.billing_province}</p>
+                        )}
+                      </div>
+
+                      {/* Billing Canton and District */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="billing_canton" className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantón *
+                          </label>
+                          <input
+                            type="text"
+                            id="billing_canton"
+                            value={formData.billing_canton}
+                            onChange={(e) => handleInputChange('billing_canton', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                              errors.billing_canton
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                            placeholder="Cantón"
+                          />
+                          {errors.billing_canton && (
+                            <p className="mt-1 text-sm text-red-500">{errors.billing_canton}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label htmlFor="billing_district" className="block text-sm font-medium text-gray-700 mb-1">
+                            Distrito *
+                          </label>
+                          <input
+                            type="text"
+                            id="billing_district"
+                            value={formData.billing_district}
+                            onChange={(e) => handleInputChange('billing_district', e.target.value)}
+                            className={clsx(
+                              'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base',
+                              errors.billing_district
+                                ? 'border-red-300 focus:border-red-500'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            )}
+                            placeholder="Distrito"
+                          />
+                          {errors.billing_district && (
+                            <p className="mt-1 text-sm text-red-500">{errors.billing_district}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Billing Exact Address */}
+                      <div>
+                        <label htmlFor="billing_exact_address" className="block text-sm font-medium text-gray-700 mb-1">
+                          Dirección exacta *
+                        </label>
+                        <textarea
+                          id="billing_exact_address"
+                          value={formData.billing_exact_address}
+                          onChange={(e) => handleInputChange('billing_exact_address', e.target.value)}
+                          rows={2}
+                          className={clsx(
+                            'w-full px-4 py-3 rounded-xl border-2 transition-colors outline-none text-base resize-none',
+                            errors.billing_exact_address
+                              ? 'border-red-300 focus:border-red-500'
+                              : 'border-gray-200 focus:border-indigo-500'
+                          )}
+                          placeholder="Dirección completa para facturación"
+                        />
+                        {errors.billing_exact_address && (
+                          <p className="mt-1 text-sm text-red-500">{errors.billing_exact_address}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Order Total */}
+                <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Subtotal productos</span>
+                    <span>{formatPrice(totalPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Envío ({selectedShipping.name})</span>
+                    <span className={shippingCost === 0 ? 'text-green-600 font-medium' : ''}>
+                      {shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-200">
+                    <span>Total a pagar</span>
+                    <span className="text-indigo-600">{formatPrice(totalWithShipping)}</span>
+                  </div>
                 </div>
-                {errors.phone && (
-                  <p className="mt-1 text-sm text-red-500">{errors.phone}</p>
-                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting || state.items.length === 0}
+                  className={clsx(
+                    'w-full py-4 rounded-xl font-semibold text-white transition-all touch-target text-base',
+                    isSubmitting || state.items.length === 0
+                      ? 'bg-gray-300 cursor-not-allowed'
+                      : 'bg-[#f6a07a] active:bg-[#e58e6a] active:scale-[0.98]'
+                  )}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Procesando...
+                    </span>
+                  ) : (
+                    `Confirmar Pedido - ${formatPrice(totalWithShipping)}`
+                  )}
+                </button>
+
+                <p className="text-xs text-gray-500 text-center">
+                  Te contactaremos para coordinar el pago y la entrega.
+                </p>
               </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting || state.items.length === 0}
-                className={clsx(
-                  'w-full py-4 rounded-xl font-semibold text-white transition-all touch-target text-base',
-                  isSubmitting || state.items.length === 0
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-indigo-600 active:bg-indigo-700 active:scale-[0.98]'
-                )}
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Procesando...
-                  </span>
-                ) : (
-                  'Confirmar Pedido'
-                )}
-              </button>
-
-              <p className="text-xs text-gray-500 text-center">
-                Te contactaremos para coordinar el pago y la entrega.
-              </p>
             </form>
           </>
         )}

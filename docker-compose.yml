@@ -13,6 +13,7 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
+      - CRON_SECRET=${CRON_SECRET}
     restart: unless-stopped
     volumes:
       - ./public/uploads:/app/public/uploads

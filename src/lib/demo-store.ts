@@ -15,10 +15,34 @@ export interface DemoProduct {
 
 export interface DemoOrderItem {
   product_id: string
+  variant_id: string | null
+  variant_name: string | null
   name: string
   price: number
   quantity: number
   type: 'in_stock' | 'pre_order'
+}
+
+export interface DemoProductVariant {
+  id: string
+  product_id: string
+  name: string
+  sku: string | null
+  price: number
+  stock: number
+  is_default: boolean
+  sort_order: number
+  created_at: string
+}
+
+export interface DemoProductImage {
+  id: string
+  product_id: string
+  image_url: string
+  alt_text: string | null
+  sort_order: number
+  is_primary: boolean
+  created_at: string
 }
 
 export interface DemoOrder {
@@ -70,6 +94,8 @@ const initialProducts: DemoProduct[] = [
 
 // In-memory stores
 let products: DemoProduct[] = [...initialProducts]
+let productVariants: DemoProductVariant[] = []
+let productImages: DemoProductImage[] = []
 let orders: DemoOrder[] = []
 let weekCycles: DemoWeekCycle[] = []
 
@@ -137,6 +163,107 @@ export function bulkUpdateDiscount(productIds: string[], discountPercentage: num
   }
 }
 
+// Product Variants CRUD
+export function getVariantsByProductId(productId: string): DemoProductVariant[] {
+  return productVariants
+    .filter(v => v.product_id === productId)
+    .sort((a, b) => a.sort_order - b.sort_order)
+}
+
+export function getVariant(id: string): DemoProductVariant | null {
+  return productVariants.find(v => v.id === id) || null
+}
+
+export function createVariant(data: Omit<DemoProductVariant, 'id' | 'created_at'>): DemoProductVariant {
+  const variant: DemoProductVariant = {
+    ...data,
+    id: generateId(),
+    created_at: new Date().toISOString(),
+  }
+  productVariants.push(variant)
+  return variant
+}
+
+export function updateVariant(id: string, data: Partial<DemoProductVariant>): DemoProductVariant | null {
+  const index = productVariants.findIndex(v => v.id === id)
+  if (index === -1) return null
+  productVariants[index] = { ...productVariants[index], ...data }
+  return productVariants[index]
+}
+
+export function deleteVariant(id: string): boolean {
+  const index = productVariants.findIndex(v => v.id === id)
+  if (index === -1) return false
+  productVariants.splice(index, 1)
+  return true
+}
+
+export function deleteVariantsByProductId(productId: string): void {
+  productVariants = productVariants.filter(v => v.product_id !== productId)
+}
+
+// Get products with their variants
+export function getProductsWithVariants(): (DemoProduct & { variants: DemoProductVariant[]; images?: DemoProductImage[] })[] {
+  return getProducts().map(product => ({
+    ...product,
+    variants: getVariantsByProductId(product.id),
+    images: getImagesByProductId(product.id)
+  }))
+}
+
+// Product Images CRUD
+export function getImagesByProductId(productId: string): DemoProductImage[] {
+  return productImages
+    .filter(img => img.product_id === productId)
+    .sort((a, b) => a.sort_order - b.sort_order)
+}
+
+export function createImage(data: Omit<DemoProductImage, 'id' | 'created_at'>): DemoProductImage {
+  const image: DemoProductImage = {
+    ...data,
+    id: generateId(),
+    created_at: new Date().toISOString(),
+  }
+  productImages.push(image)
+  return image
+}
+
+export function deleteImage(id: string): boolean {
+  const index = productImages.findIndex(img => img.id === id)
+  if (index === -1) return false
+  productImages.splice(index, 1)
+  return true
+}
+
+export function deleteImagesByProductId(productId: string): void {
+  productImages = productImages.filter(img => img.product_id !== productId)
+}
+
+export function updateImageSortOrder(id: string, sortOrder: number): DemoProductImage | null {
+  const index = productImages.findIndex(img => img.id === id)
+  if (index === -1) return null
+  productImages[index] = { ...productImages[index], sort_order: sortOrder }
+  return productImages[index]
+}
+
+// Initialize default variants for existing products (for backward compatibility)
+export function initializeDefaultVariants(): void {
+  for (const product of products) {
+    const existingVariants = productVariants.filter(v => v.product_id === product.id)
+    if (existingVariants.length === 0) {
+      createVariant({
+        product_id: product.id,
+        name: 'Default',
+        sku: null,
+        price: product.price,
+        stock: product.stock,
+        is_default: true,
+        sort_order: 0
+      })
+    }
+  }
+}
+
 // Orders CRUD
 export function getOrders(): DemoOrder[] {
   return orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -162,10 +289,20 @@ export function createOrder(data: Omit<DemoOrder, 'id' | 'created_at' | 'week_cy
   if (order.status === 'pending') {
     for (const item of order.items) {
       if (item.type === 'in_stock') {
-        const product = getProduct(item.product_id)
-        if (product) {
-          const newStock = Math.max(0, product.stock - item.quantity)
-          updateProductStock(item.product_id, newStock)
+        // Update variant stock if variant_id exists
+        if (item.variant_id) {
+          const variant = getVariant(item.variant_id)
+          if (variant) {
+            const newStock = Math.max(0, variant.stock - item.quantity)
+            updateVariant(item.variant_id, { stock: newStock })
+          }
+        } else {
+          // Fallback to product stock for backward compatibility
+          const product = getProduct(item.product_id)
+          if (product) {
+            const newStock = Math.max(0, product.stock - item.quantity)
+            updateProductStock(item.product_id, newStock)
+          }
         }
       }
     }

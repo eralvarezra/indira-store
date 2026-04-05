@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen } from 'lucide-react'
 import clsx from 'clsx'
-import { Product, Order, Category } from '@/types/database.types'
+import { Product, Order, Category, ProductVariant, ProductWithVariants, ProductImage, PaymentMethod } from '@/types/database.types'
 
 type Tab = 'products' | 'orders' | 'promos' | 'categories' | 'reports' | 'settings'
 
@@ -35,7 +35,7 @@ interface WeeklyReport {
 export default function AdminDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('products')
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<ProductWithVariants[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [settings, setSettings] = useState({ telegram_bot_token: '', telegram_chat_id: '' })
   const [isLoading, setIsLoading] = useState(true)
@@ -49,6 +49,8 @@ export default function AdminDashboard() {
     stock: '',
     category: '',
   })
+  const [productVariants, setProductVariants] = useState<Partial<ProductVariant>[]>([])
+  const [productImages, setProductImages] = useState<Partial<ProductImage>[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -83,6 +85,19 @@ export default function AdminDashboard() {
     sort_order: 0,
   })
 
+  // Payment methods state
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<PaymentMethod | null>(null)
+  const [paymentForm, setPaymentForm] = useState({
+    name: '',
+    description: '',
+    instructions: '',
+    account_info: '',
+    is_active: true,
+    sort_order: 0,
+  })
+
   useEffect(() => {
     checkAuth()
     fetchData()
@@ -102,12 +117,13 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const [productsRes, ordersRes, settingsRes, cyclesRes, categoriesRes] = await Promise.all([
+      const [productsRes, ordersRes, settingsRes, cyclesRes, categoriesRes, paymentMethodsRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/orders'),
         fetch('/api/admin/settings'),
         fetch('/api/week-cycles'),
         fetch('/api/categories'),
+        fetch('/api/admin/payment-methods'),
       ])
 
       if (productsRes.ok) {
@@ -134,6 +150,11 @@ export default function AdminDashboard() {
         const data = await categoriesRes.json()
         setCategories(data.categories || [])
       }
+
+      if (paymentMethodsRes.ok) {
+        const data = await paymentMethodsRes.json()
+        setPaymentMethods(data.paymentMethods || [])
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -150,9 +171,6 @@ export default function AdminDashboard() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Show preview immediately
-    const previewUrl = URL.createObjectURL(file)
-    setImagePreview(previewUrl)
     setIsUploading(true)
 
     try {
@@ -167,32 +185,53 @@ export default function AdminDashboard() {
       const data = await response.json()
 
       if (response.ok && data.url) {
-        setProductForm({ ...productForm, image_url: data.url })
+        // Add new image to the list
+        const newImage = {
+          image_url: data.url,
+          is_primary: productImages.length === 0,
+          sort_order: productImages.length
+        }
+        setProductImages([...productImages, newImage])
       } else {
         alert(data.error || 'Error al subir la imagen')
-        setImagePreview(null)
       }
     } catch (error) {
       console.error('Upload error:', error)
       alert('Error al subir la imagen')
-      setImagePreview(null)
     } finally {
       setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
   const handleSaveProduct = async () => {
     try {
+      // If variants exist, use the first variant's price and stock for the product
+      const firstVariant = productVariants[0]
+      const productPrice = productVariants.length > 0 && firstVariant?.price
+        ? parseFloat(firstVariant.price.toString())
+        : parseFloat(productForm.price) || 0
+      const productStock = productVariants.length > 0 && firstVariant?.stock !== undefined
+        ? parseInt(firstVariant.stock.toString()) || 0
+        : parseInt(productForm.stock) || 0
+
+      // Use first image as the main product image
+      const mainImageUrl = productImages.length > 0 ? productImages[0].image_url : productForm.image_url || null
+
       const productData = {
         name: productForm.name,
         description: productForm.description,
-        price: parseFloat(productForm.price) || 0,
-        image_url: productForm.image_url || null,
-        stock: parseInt(productForm.stock) || 0,
+        price: productPrice,
+        image_url: mainImageUrl,
+        stock: productStock,
         category: productForm.category || null,
       }
 
       let response
+      let productId = editingProduct?.id
+
       if (editingProduct) {
         response = await fetch(`/api/products/${editingProduct.id}`, {
           method: 'PUT',
@@ -205,12 +244,74 @@ export default function AdminDashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(productData),
         })
+        if (response.ok) {
+          const data = await response.json()
+          productId = data.product.id
+        }
       }
 
-      if (response.ok) {
+      if (response.ok && productId) {
+        // Handle images - delete existing and create new ones
+        if (editingProduct) {
+          const existingImages = (editingProduct as ProductWithVariants & { images?: ProductImage[] }).images || []
+          for (const image of existingImages) {
+            if (image.id) {
+              await fetch(`/api/products/${productId}/images?imageId=${image.id}`, {
+                method: 'DELETE'
+              })
+            }
+          }
+        }
+
+        // Create new images
+        for (let i = 0; i < productImages.length; i++) {
+          const image = productImages[i]
+          await fetch(`/api/products/${productId}/images`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_url: image.image_url,
+              alt_text: image.alt_text || null,
+              is_primary: i === 0,
+              sort_order: i,
+            }),
+          })
+        }
+
+        // Handle variants
+        if (productVariants.length > 0) {
+          // Delete existing variants for this product
+          if (editingProduct) {
+            const existingVariants = (editingProduct as ProductWithVariants).variants || []
+            for (const variant of existingVariants) {
+              await fetch(`/api/products/${productId}/variants?variantId=${variant.id}`, {
+                method: 'DELETE'
+              })
+            }
+          }
+
+          // Create new variants
+          for (let i = 0; i < productVariants.length; i++) {
+            const variant = productVariants[i]
+            await fetch(`/api/products/${productId}/variants`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: variant.name,
+                sku: variant.sku || null,
+                price: parseFloat(variant.price?.toString() || '0'),
+                stock: parseInt(variant.stock?.toString() || '0'),
+                is_default: i === 0, // First variant is default
+                sort_order: i,
+              }),
+            })
+          }
+        }
+
         setShowProductModal(false)
         setEditingProduct(null)
         setProductForm({ name: '', description: '', price: '', image_url: '', stock: '', category: '' })
+        setProductVariants([])
         setImagePreview(null)
         fetchData()
       }
@@ -246,6 +347,108 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error saving settings:', error)
     }
+  }
+
+  // Payment methods handlers
+  const handleSavePaymentMethod = async () => {
+    if (!paymentForm.name.trim()) {
+      alert('El nombre es requerido')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/payment-methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: editingPayment ? 'update' : 'create',
+          paymentMethod: editingPayment
+            ? { ...paymentForm, id: editingPayment.id }
+            : paymentForm,
+        }),
+      })
+
+      if (response.ok) {
+        fetchData()
+        setShowPaymentModal(false)
+        setEditingPayment(null)
+        setPaymentForm({
+          name: '',
+          description: '',
+          instructions: '',
+          account_info: '',
+          is_active: true,
+          sort_order: 0,
+        })
+      } else {
+        alert('Error al guardar el método de pago')
+      }
+    } catch (error) {
+      console.error('Error saving payment method:', error)
+      alert('Error al guardar el método de pago')
+    }
+  }
+
+  const handleDeletePaymentMethod = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este método de pago?')) return
+
+    try {
+      const response = await fetch('/api/admin/payment-methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          paymentMethod: { id },
+        }),
+      })
+
+      if (response.ok) {
+        setPaymentMethods(paymentMethods.filter((p) => p.id !== id))
+      } else {
+        alert('Error al eliminar el método de pago')
+      }
+    } catch (error) {
+      console.error('Error deleting payment method:', error)
+      alert('Error al eliminar el método de pago')
+    }
+  }
+
+  const openPaymentModal = (payment?: PaymentMethod) => {
+    if (payment) {
+      setEditingPayment(payment)
+      setPaymentForm({
+        name: payment.name,
+        description: payment.description || '',
+        instructions: payment.instructions || '',
+        account_info: payment.account_info || '',
+        is_active: payment.is_active,
+        sort_order: payment.sort_order,
+      })
+    } else {
+      setEditingPayment(null)
+      setPaymentForm({
+        name: '',
+        description: '',
+        instructions: '',
+        account_info: '',
+        is_active: true,
+        sort_order: paymentMethods.length,
+      })
+    }
+    setShowPaymentModal(true)
+  }
+
+  const closePaymentModal = () => {
+    setShowPaymentModal(false)
+    setEditingPayment(null)
+    setPaymentForm({
+      name: '',
+      description: '',
+      instructions: '',
+      account_info: '',
+      is_active: true,
+      sort_order: 0,
+    })
   }
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: 'confirmed' | 'cancelled') => {
@@ -603,7 +806,7 @@ export default function AdminDashboard() {
   // Products without category
   const productsWithoutCategory = products.filter(p => !p.category)
 
-  const openEditModal = (product: Product) => {
+  const openEditModal = (product: ProductWithVariants) => {
     setEditingProduct(product)
     setProductForm({
       name: product.name,
@@ -613,6 +816,12 @@ export default function AdminDashboard() {
       stock: product.stock.toString(),
       category: product.category || '',
     })
+    // Load variants if they exist
+    const variants = product.variants || []
+    setProductVariants(variants.length > 0 ? variants : [])
+    // Load images if they exist
+    const images = (product as ProductWithVariants & { images?: ProductImage[] }).images || []
+    setProductImages(images.length > 0 ? images : [])
     setImagePreview(product.image_url || null)
     setShowProductModal(true)
   }
@@ -621,6 +830,8 @@ export default function AdminDashboard() {
     setShowProductModal(false)
     setEditingProduct(null)
     setProductForm({ name: '', description: '', price: '', image_url: '', stock: '', category: '' })
+    setProductVariants([])
+    setProductImages([])
     setImagePreview(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -1090,11 +1301,9 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-semibold">Gestión de Categorías</h2>
-                    {productsWithoutCategory.length > 0 && (
-                      <p className="text-sm text-amber-600 mt-1">
-                        ⚠️ {productsWithoutCategory.length} producto(s) sin categoría
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-500 mt-1">
+                      {categories.filter(c => !c.parent_id).length} categorías · {categories.filter(c => c.parent_id).length} subcategorías
+                    </p>
                   </div>
                   <button
                     onClick={() => {
@@ -1109,98 +1318,226 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {products.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay productos. Las categorías aparecerán cuando agregues productos.</p>
-                  </div>
-                ) : categoriesWithProducts.length === 0 ? (
+                {categories.length === 0 ? (
                   <div className="text-center py-12">
                     <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay categorías con productos. Asigna categorías a tus productos.</p>
-                    {productsWithoutCategory.length > 0 && (
-                      <p className="text-sm text-amber-600 mt-2">
-                        Tienes {productsWithoutCategory.length} producto(s) sin categoría asignada.
-                      </p>
-                    )}
+                    <p className="text-gray-500 mb-4">No hay categorías creadas.</p>
+                    <button
+                      onClick={() => {
+                        setEditingCategory(null)
+                        setCategoryForm({ name: '', slug: '', icon: '', parent_id: null, sort_order: 0 })
+                        setShowCategoryModal(true)
+                      }}
+                      className="bg-[#f6a07a] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
+                    >
+                      Crear primera categoría
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {categoriesWithProducts.map((category) => {
-                      const categoryProductCount = products.filter(p => p.category === category.id).length
-                      const subcategoriesWithProducts = category.subcategories?.filter(sub =>
-                        categoryIdsWithProducts.has(sub.id)
-                      ) || []
+                    {(() => {
+                      const parentCategories = categories.filter(c => !c.parent_id)
+                      const allSubcategories = categories.filter(c => c.parent_id)
+                      const orphanSubcategories = categories.filter(c => c.parent_id && !categories.find(p => p.id === c.parent_id))
 
                       return (
-                        <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                          <div className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="text-2xl">{category.icon}</span>
-                              <div>
-                                <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                                <p className="text-sm text-gray-500">
-                                  {categoryProductCount} producto{categoryProductCount !== 1 ? 's' : ''}
-                                  {subcategoriesWithProducts.length > 0 && ` · ${subcategoriesWithProducts.length} subcategoría${subcategoriesWithProducts.length !== 1 ? 's' : ''}`}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditingCategory(category)
-                                  setCategoryForm({
-                                    name: category.name,
-                                    slug: category.slug,
-                                    icon: category.icon || '',
-                                    parent_id: null,
-                                    sort_order: category.sort_order,
-                                  })
-                                  setShowCategoryModal(true)
-                                }}
-                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
+                        <>
+                          {parentCategories.map((category) => {
+                            const subcategories = allSubcategories.filter(c => c.parent_id === category.id)
 
-                          {/* Subcategories with Products */}
-                          {subcategoriesWithProducts.length > 0 && (
-                            <div className="border-t bg-gray-50 p-3 space-y-2">
-                              {subcategoriesWithProducts.map((sub) => {
-                                const subProductCount = products.filter(p => p.category === sub.id).length
-                                return (
-                                  <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                      <span>{sub.icon}</span>
-                                      <span className="text-sm text-gray-700">{sub.name}</span>
-                                      <span className="text-xs text-gray-400">({subProductCount})</span>
-                                    </div>
+                            return (
+                              <div key={category.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                                <div className="p-4 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+                                  <div>
+                                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                                    <p className="text-xs text-gray-400">/{category.slug}</p>
+                                  </div>
+                                  <div className="flex gap-1">
                                     <button
                                       onClick={() => {
-                                        setEditingCategory(sub)
+                                        setEditingCategory(category)
                                         setCategoryForm({
-                                          name: sub.name,
-                                          slug: sub.slug,
-                                          icon: sub.icon || '',
-                                          parent_id: sub.parent_id,
-                                          sort_order: sub.sort_order,
+                                          name: category.name,
+                                          slug: category.slug,
+                                          icon: category.icon || '',
+                                          parent_id: null,
+                                          sort_order: category.sort_order,
                                         })
                                         setShowCategoryModal(true)
                                       }}
-                                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                      title="Editar categoría"
                                     >
-                                      <Edit2 className="w-3.5 h-3.5" />
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory(null)
+                                        setCategoryForm({
+                                          name: '',
+                                          slug: '',
+                                          icon: '',
+                                          parent_id: category.id,
+                                          sort_order: (subcategories?.length || 0) + 1,
+                                        })
+                                        setShowCategoryModal(true)
+                                      }}
+                                      className="p-2 text-[#E8775A] hover:text-[#d66a4a] hover:bg-orange-50 rounded-lg transition-colors"
+                                      title="Agregar subcategoría"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm(`¿Estás seguro de eliminar la categoría "${category.name}"?${subcategories.length > 0 ? '\n\nEsto también eliminará sus subcategorías.' : ''}`)) return
+                                        try {
+                                          const response = await fetch(`/api/categories?id=${category.id}`, { method: 'DELETE' })
+                                          if (response.ok) {
+                                            fetchData()
+                                          } else {
+                                            alert('Error al eliminar la categoría')
+                                          }
+                                        } catch (error) {
+                                          console.error('Error deleting category:', error)
+                                          alert('Error al eliminar la categoría')
+                                        }
+                                      }}
+                                      className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Eliminar categoría"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
-                                )
-                              })}
+                                </div>
+
+                                {/* Subcategories */}
+                                {subcategories.length > 0 && (
+                                  <div className="border-t">
+                                    <div className="px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Subcategorías ({subcategories.length})
+                                    </div>
+                                    <div className="divide-y">
+                                      {subcategories.map((sub) => (
+                                        <div key={sub.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                                          <div>
+                                            <span className="text-sm text-gray-700">{sub.name}</span>
+                                            <p className="text-xs text-gray-400">/{sub.slug}</p>
+                                          </div>
+                                          <div className="flex gap-1">
+                                            <button
+                                              onClick={() => {
+                                                setEditingCategory(sub)
+                                                setCategoryForm({
+                                                  name: sub.name,
+                                                  slug: sub.slug,
+                                                  icon: sub.icon || '',
+                                                  parent_id: sub.parent_id,
+                                                  sort_order: sub.sort_order,
+                                                })
+                                                setShowCategoryModal(true)
+                                              }}
+                                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                              title="Editar"
+                                            >
+                                              <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={async () => {
+                                                if (!confirm(`¿Estás seguro de eliminar la subcategoría "${sub.name}"?`)) return
+                                                try {
+                                                  const response = await fetch(`/api/categories?id=${sub.id}`, { method: 'DELETE' })
+                                                  if (response.ok) {
+                                                    fetchData()
+                                                  } else {
+                                                    alert('Error al eliminar la subcategoría')
+                                                  }
+                                                } catch (error) {
+                                                  console.error('Error deleting subcategory:', error)
+                                                  alert('Error al eliminar la subcategoría')
+                                                }
+                                              }}
+                                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                              title="Eliminar"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Empty subcategories state */}
+                                {subcategories.length === 0 && (
+                                  <div className="border-t px-4 py-3 bg-gray-50">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory(null)
+                                        setCategoryForm({
+                                          name: '',
+                                          slug: '',
+                                          icon: '',
+                                          parent_id: category.id,
+                                          sort_order: 1,
+                                        })
+                                        setShowCategoryModal(true)
+                                      }}
+                                      className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                      Agregar subcategoría
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+
+                          {/* Orphan subcategories (without parent) */}
+                          {orphanSubcategories.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                              <h4 className="font-medium text-amber-800 mb-2">⚠️ Subcategorías sin categoría padre</h4>
+                              <div className="space-y-2">
+                                {orphanSubcategories.map((orphan) => (
+                                  <div key={orphan.id} className="flex items-center justify-between bg-white p-2 rounded-lg">
+                                    <span className="text-sm">{orphan.name}</span>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => {
+                                          setEditingCategory(orphan)
+                                          setCategoryForm({
+                                            name: orphan.name,
+                                            slug: orphan.slug,
+                                            icon: orphan.icon || '',
+                                            parent_id: null,
+                                            sort_order: orphan.sort_order,
+                                          })
+                                          setShowCategoryModal(true)
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                                      >
+                                        <Edit2 className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          if (!confirm(`¿Eliminar "${orphan.name}"?`)) return
+                                          await fetch(`/api/categories?id=${orphan.id}`, { method: 'DELETE' })
+                                          fetchData()
+                                        }}
+                                        className="p-1 text-red-400 hover:text-red-600 rounded"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
-                        </div>
+                        </>
                       )
-                    })}
+                    })()}
                   </div>
                 )}
               </div>
@@ -1405,40 +1742,103 @@ export default function AdminDashboard() {
 
             {/* Settings Tab */}
             {activeTab === 'settings' && (
-              <div className="max-w-lg">
-                <h2 className="text-lg font-semibold mb-6">Configuración de Telegram</h2>
-                <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Bot Token
-                    </label>
-                    <input
-                      type="password"
-                      value={settings.telegram_bot_token}
-                      onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
-                      placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                    />
+              <div className="space-y-8">
+                {/* Telegram Settings */}
+                <div className="max-w-lg">
+                  <h2 className="text-lg font-semibold mb-4">Configuración de Telegram</h2>
+                  <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Bot Token
+                      </label>
+                      <input
+                        type="password"
+                        value={settings.telegram_bot_token}
+                        onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
+                        placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Chat ID
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.telegram_chat_id}
+                        onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
+                        placeholder="-1001234567890"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSaveSettings}
+                      className="w-full bg-[#f6a07a] text-white py-3 rounded-xl font-semibold hover:bg-[#e58e6a] transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Save className="w-5 h-5" />
+                      Guardar Configuración
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Chat ID
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.telegram_chat_id}
-                      onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
-                      placeholder="-1001234567890"
-                    />
+                </div>
+
+                {/* Payment Methods */}
+                <div className="max-w-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Métodos de Pago</h2>
+                    <button
+                      onClick={() => openPaymentModal()}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#f6a07a] text-white rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Nuevo Método
+                    </button>
                   </div>
-                  <button
-                    onClick={handleSaveSettings}
-                    className="w-full bg-[#f6a07a] text-white py-3 rounded-xl font-semibold hover:bg-[#e58e6a] transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Save className="w-5 h-5" />
-                    Guardar Configuración
-                  </button>
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    {paymentMethods.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500">
+                        No hay métodos de pago configurados
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {paymentMethods.map((method) => (
+                          <div key={method.id} className="p-4 flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-900">{method.name}</p>
+                                {!method.is_active && (
+                                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                    Inactivo
+                                  </span>
+                                )}
+                              </div>
+                              {method.description && (
+                                <p className="text-sm text-gray-500">{method.description}</p>
+                              )}
+                              {method.account_info && (
+                                <p className="text-xs text-gray-400 mt-1">{method.account_info}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openPaymentModal(method)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePaymentMethod(method.id)}
+                                className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1491,46 +1891,71 @@ export default function AdminDashboard() {
 
               {/* Image Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Imagen del Producto</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Imágenes del Producto
+                </label>
 
-                {/* Image Preview */}
-                {(imagePreview || productForm.image_url) ? (
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-100 mb-3">
-                    <img
-                      src={imagePreview || productForm.image_url}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImagePreview(null)
-                        setProductForm({ ...productForm, image_url: '' })
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = ''
-                        }
-                      }}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-video rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="w-8 h-8 text-[#E8775A] animate-spin" />
-                    ) : (
-                      <>
-                        <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                        <span className="text-sm text-gray-500">Toca para subir imagen</span>
-                        <span className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (max 5MB)</span>
-                      </>
-                    )}
+                {/* Image Gallery */}
+                {productImages.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {productImages.map((image, index) => (
+                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={image.image_url}
+                          alt={image.alt_text || `Imagen ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Set as primary (move to first position)
+                              const updated = [...productImages]
+                              const [img] = updated.splice(index, 1)
+                              updated.unshift({ ...img, is_primary: true })
+                              setProductImages(updated.map((img, i) => ({ ...img, is_primary: i === 0 })))
+                            }}
+                            className="p-1.5 bg-white rounded-full hover:bg-gray-100"
+                            title="Establecer como principal"
+                          >
+                            <ImageIcon className="w-4 h-4 text-gray-700" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProductImages(productImages.filter((_, i) => i !== index))
+                            }}
+                            className="p-1.5 bg-red-500 rounded-full hover:bg-red-600"
+                            title="Eliminar"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                        {index === 0 && (
+                          <span className="absolute bottom-1 left-1 bg-[#E8775A] text-white text-xs px-1.5 py-0.5 rounded">
+                            Principal
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
+
+                {/* Upload Area */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="aspect-video rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-8 h-8 text-[#E8775A] animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-500">Subir imagen</span>
+                      <span className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (max 5MB)</span>
+                    </>
+                  )}
+                </div>
 
                 <input
                   ref={fileInputRef}
@@ -1547,17 +1972,39 @@ export default function AdminDashboard() {
                     <span className="text-xs text-gray-400">o pega una URL</span>
                     <div className="flex-1 h-px bg-gray-200" />
                   </div>
-                  <input
-                    type="url"
-                    value={productForm.image_url && !imagePreview ? productForm.image_url : ''}
-                    onChange={(e) => {
-                      setProductForm({ ...productForm, image_url: e.target.value })
-                      setImagePreview(null)
-                    }}
-                    placeholder="https://..."
-                    className="w-full px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none text-sm"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      id="imageUrlInput"
+                      placeholder="https://..."
+                      className="flex-1 px-4 py-2 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('imageUrlInput') as HTMLInputElement
+                        const url = input.value.trim()
+                        if (url) {
+                          setProductImages([
+                            ...productImages,
+                            {
+                              image_url: url,
+                              is_primary: productImages.length === 0,
+                              sort_order: productImages.length
+                            }
+                          ])
+                          input.value = ''
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-100 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Agregar
+                    </button>
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  La primera imagen será la principal. Puedes agregar múltiples imágenes.
+                </p>
               </div>
 
               {/* Category */}
@@ -1593,6 +2040,164 @@ export default function AdminDashboard() {
                   onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                 />
+              </div>
+
+              {/* Variants Section */}
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Variantes (opcional)</label>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Agrega variantes como diferentes tamaños o presentaciones con precios individuales
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProductVariants([
+                      ...productVariants,
+                      {
+                        name: '',
+                        sku: '',
+                        price: parseFloat(productForm.price) || 0,
+                        stock: 0,
+                        is_default: productVariants.length === 0,
+                        sort_order: productVariants.length
+                      }
+                    ])}
+                    className="text-sm text-[#E8775A] hover:text-[#d66a4a] flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Agregar
+                  </button>
+                </div>
+
+                {productVariants.length > 0 ? (
+                  <div className="space-y-3">
+                    {productVariants.map((variant, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-gray-800">
+                            Variante {index + 1}
+                            {variant.is_default && (
+                              <span className="ml-2 text-xs bg-[#E8775A] text-white px-2 py-0.5 rounded-full">
+                                Predeterminada
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProductVariants(productVariants.filter((_, i) => i !== index))
+                            }}
+                            className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Eliminar
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {/* Nombre de la variante */}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Nombre *</label>
+                            <input
+                              type="text"
+                              placeholder="ej: 100ml, Grande"
+                              value={variant.name || ''}
+                              onChange={(e) => {
+                                const updated = [...productVariants]
+                                updated[index] = { ...updated[index], name: e.target.value }
+                                setProductVariants(updated)
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
+                            />
+                          </div>
+
+                          {/* SKU */}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">SKU (opcional)</label>
+                            <input
+                              type="text"
+                              placeholder="Código interno"
+                              value={variant.sku || ''}
+                              onChange={(e) => {
+                                const updated = [...productVariants]
+                                updated[index] = { ...updated[index], sku: e.target.value }
+                                setProductVariants(updated)
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
+                            />
+                          </div>
+
+                          {/* Precio - más destacado */}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">
+                              Precio (CRC) *
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₡</span>
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={variant.price ?? ''}
+                                onChange={(e) => {
+                                  const updated = [...productVariants]
+                                  updated[index] = { ...updated[index], price: parseFloat(e.target.value) || 0 }
+                                  setProductVariants(updated)
+                                }}
+                                className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none font-medium"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Stock */}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Stock *</label>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              value={variant.stock ?? ''}
+                              onChange={(e) => {
+                                const updated = [...productVariants]
+                                updated[index] = { ...updated[index], stock: parseInt(e.target.value) || 0 }
+                                setProductVariants(updated)
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="radio"
+                              name="default_variant"
+                              checked={variant.is_default || false}
+                              onChange={(e) => {
+                                const updated = productVariants.map((v, i) => ({
+                                  ...v,
+                                  is_default: i === index
+                                }))
+                                setProductVariants(updated)
+                              }}
+                              className="rounded border-gray-300 text-[#E8775A] focus:ring-[#E8775A]"
+                            />
+                            <span>Variante predeterminada (se muestra primero)</span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                      <p className="text-xs text-blue-700">
+                        <strong>Tip:</strong> Cada variante tiene su propio precio y stock. El precio del producto se actualiza automáticamente con el de la variante predeterminada.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                    Sin variantes. El producto tendrá precio y stock únicos.
+                  </p>
+                )}
               </div>
               <button
                 onClick={handleSaveProduct}
@@ -1637,29 +2242,18 @@ export default function AdminDashboard() {
                 <input
                   type="text"
                   value={categoryForm.name}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  onChange={(e) => {
+                    const name = e.target.value
+                    const slug = name
+                      .toLowerCase()
+                      .normalize('NFD')
+                      .replace(/[\u0300-\u036f]/g, '')
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/^-+|-+$/g, '')
+                    setCategoryForm({ ...categoryForm, name, slug })
+                  }}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                   placeholder="Nombre de la categoría"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Slug (URL)</label>
-                <input
-                  type="text"
-                  value={categoryForm.slug}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
-                  placeholder="categoria-url"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Icono (emoji)</label>
-                <input
-                  type="text"
-                  value={categoryForm.icon}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
-                  placeholder="🧴"
                 />
               </div>
               {!editingCategory && categoryForm.parent_id === null && (
@@ -1686,7 +2280,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setCategoryForm({ ...categoryForm, parent_id: e.target.value || null })}
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
                   >
-                    {categories.map((cat) => (
+                    {categories.filter(c => !c.parent_id).map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
@@ -1694,16 +2288,32 @@ export default function AdminDashboard() {
               )}
               <button
                 onClick={async () => {
-                  if (!categoryForm.name || !categoryForm.slug) {
-                    alert('Nombre y slug son requeridos')
+                  if (!categoryForm.name) {
+                    alert('El nombre es requerido')
                     return
                   }
+
+                  // Generar slug si está vacío
+                  const slug = categoryForm.slug || categoryForm.name
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+
                   try {
                     const url = '/api/categories'
                     const method = editingCategory ? 'PUT' : 'POST'
-                    const body = editingCategory
-                      ? { ...categoryForm, id: editingCategory.id }
-                      : categoryForm
+                    const body = {
+                      name: categoryForm.name,
+                      slug,
+                      icon: categoryForm.icon || null,
+                      parent_id: categoryForm.parent_id || null,
+                      sort_order: categoryForm.sort_order || 0,
+                      ...(editingCategory ? { id: editingCategory.id } : {})
+                    }
+
+                    console.log('Sending category data:', body)
 
                     const response = await fetch(url, {
                       method,
@@ -1711,11 +2321,14 @@ export default function AdminDashboard() {
                       body: JSON.stringify(body),
                     })
 
+                    const responseData = await response.json()
+                    console.log('Response:', responseData)
+
                     if (response.ok) {
                       setShowCategoryModal(false)
                       fetchData()
                     } else {
-                      alert('Error al guardar la categoría')
+                      alert(responseData.details || responseData.error || 'Error al guardar la categoría')
                     }
                   } catch (error) {
                     console.error('Error saving category:', error)
@@ -1875,6 +2488,90 @@ export default function AdminDashboard() {
                     Guardar Cambios
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Method Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={closePaymentModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">
+                {editingPayment ? 'Editar Método de Pago' : 'Nuevo Método de Pago'}
+              </h3>
+              <button onClick={closePaymentModal} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={paymentForm.name}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="Ej: Sinpe Móvil, Transferencia Bancaria"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <input
+                  type="text"
+                  value={paymentForm.description}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, description: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  placeholder="Descripción breve del método"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instrucciones</label>
+                <textarea
+                  value={paymentForm.instructions}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, instructions: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none resize-none"
+                  rows={2}
+                  placeholder="Instrucciones para el cliente"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Información de la Cuenta</label>
+                <textarea
+                  value={paymentForm.account_info}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, account_info: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none resize-none"
+                  rows={2}
+                  placeholder="Ej: Banco Nacional - Cuenta: 1234-5678-90"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Orden</label>
+                <input
+                  type="number"
+                  value={paymentForm.sort_order}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, sort_order: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                  min="0"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.is_active}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, is_active: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-[#E8775A] focus:ring-[#E8775A]"
+                />
+                <span className="text-sm text-gray-700">Método activo</span>
+              </label>
+              <button
+                onClick={handleSavePaymentMethod}
+                className="w-full py-3 rounded-xl font-semibold bg-[#f6a07a] text-white hover:bg-[#e58e6a] transition-colors"
+              >
+                {editingPayment ? 'Guardar Cambios' : 'Crear Método de Pago'}
               </button>
             </div>
           </div>

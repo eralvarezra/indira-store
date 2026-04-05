@@ -1,13 +1,13 @@
 'use client'
 
-import { Product, SKINCARE_CATEGORIES, getCategoryInfo } from '@/types/database.types'
+import { Product, ProductVariant, ProductImage, ProductWithVariants, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
-import { X, Plus, Minus, ShoppingCart, Clock, AlertCircle } from 'lucide-react'
+import { X, Plus, Minus, ShoppingCart, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ProductDetailModalProps {
-  product: Product
+  product: ProductWithVariants
   isOpen: boolean
   onClose: () => void
 }
@@ -15,13 +15,35 @@ interface ProductDetailModalProps {
 export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
   const { addItem, state, updateQuantity } = useCart()
   const [isAdding, setIsAdding] = useState(false)
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
-  const cartItem = state.items.find((item) => item.product.id === product.id)
-  const quantity = cartItem?.quantity || 0
+  // Get variants and images
+  const variants = product.variants || []
+  const hasMultipleVariants = variants.length > 1
+  const images = (product as ProductWithVariants & { images?: ProductImage[] }).images || []
+  const allImages = images.length > 0 ? images : (product.image_url ? [{ image_url: product.image_url, is_primary: true }] : [])
+  const hasMultipleImages = allImages.length > 1
+
+  // Initialize with default variant
+  useEffect(() => {
+    if (variants.length > 0) {
+      const defaultVariant = variants.find(v => v.is_default) || variants[0]
+      setSelectedVariant(defaultVariant)
+    } else {
+      setSelectedVariant(null)
+    }
+    setSelectedImageIndex(0)
+  }, [product, variants])
+
+  // Get quantity for selected variant
+  const quantity = selectedVariant
+    ? state.items.find((item) => getCartItemId(item) === `${product.id}-${selectedVariant.id}`)?.quantity || 0
+    : state.items.find((item) => item.product.id === product.id && !item.variant)?.quantity || 0
 
   const handleAdd = () => {
     setIsAdding(true)
-    addItem(product)
+    addItem(product, selectedVariant || undefined)
     setTimeout(() => setIsAdding(false), 300)
   }
 
@@ -32,15 +54,14 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     }).format(price)
   }
 
-  const isOutOfStock = product.stock <= 0
-  const discountPercentage = (product as Product & { discount_percentage?: number }).discount_percentage || 0
-  const hasDiscount = discountPercentage > 0
-  const originalPrice = product.price
-  const discountedPrice = hasDiscount ? originalPrice * (1 - discountPercentage / 100) : originalPrice
+  // Calculate effective values based on selected variant
+  const effectivePrice = selectedVariant ? getEffectivePrice(product, selectedVariant) : product.price
+  const effectiveStock = selectedVariant ? getEffectiveStock(product, selectedVariant) : product.stock
+  const isOutOfStock = effectiveStock <= 0
 
-  // Get category info
-  const productWithCategory = product as Product & { category?: string }
-  const categoryInfo = productWithCategory.category ? getCategoryInfo(productWithCategory.category) : null
+  const discountPercentage = product.discount_percentage || 0
+  const hasDiscount = discountPercentage > 0
+  const discountedPrice = getDiscountedPrice(effectivePrice, discountPercentage)
 
   if (!isOpen) return null
 
@@ -73,11 +94,11 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
         {/* Scrollable content - Image + Details */}
         <div className="flex-1 overflow-y-auto scroll-container">
-          {/* Image */}
+          {/* Image Carousel */}
           <div className="relative aspect-square sm:aspect-video bg-gray-100">
-            {product.image_url ? (
+            {allImages.length > 0 && allImages[selectedImageIndex]?.image_url ? (
               <img
-                src={product.image_url}
+                src={allImages[selectedImageIndex].image_url}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
@@ -88,29 +109,65 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             )}
 
             {/* Discount Badge */}
-            {hasDiscount && !isOutOfStock && (
+            {hasDiscount && (
               <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg">
                 -{discountPercentage}%
               </div>
             )}
 
-            {/* Category Badge */}
-            {categoryInfo && (
-              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full text-xs font-medium shadow">
-                {categoryInfo.icon} {categoryInfo.name}
-              </div>
-            )}
-
-            {/* Pre-order Badge for out of stock */}
-            {isOutOfStock && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <div className="bg-amber-500 text-white px-4 py-2 rounded-full font-medium flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Pre-pedido disponible
+            {/* Image Navigation */}
+            {hasMultipleImages && (
+              <>
+                <button
+                  onClick={() => setSelectedImageIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-md transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  onClick={() => setSelectedImageIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-md transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-700" />
+                </button>
+                {/* Image Indicators */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  {allImages.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedImageIndex(index)}
+                      className={clsx(
+                        'w-2 h-2 rounded-full transition-colors',
+                        index === selectedImageIndex ? 'bg-white' : 'bg-white/50'
+                      )}
+                    />
+                  ))}
                 </div>
-              </div>
+              </>
             )}
           </div>
+
+          {/* Thumbnail Gallery */}
+          {hasMultipleImages && (
+            <div className="flex gap-2 p-2 overflow-x-auto">
+              {allImages.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedImageIndex(index)}
+                  className={clsx(
+                    'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors',
+                    index === selectedImageIndex ? 'border-[#E8775A]' : 'border-transparent hover:border-gray-300'
+                  )}
+                >
+                  <img
+                    src={image.image_url}
+                    alt={`${product.name} ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Content */}
           <div className="p-4">
@@ -123,19 +180,51 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                 {hasDiscount ? (
                   <>
                     <span className="text-sm text-gray-400 line-through block">
-                      {formatPrice(originalPrice)}
+                      {formatPrice(effectivePrice)}
                     </span>
-                    <span className="text-xl font-bold text-indigo-600">
+                    <span className="text-xl font-bold text-[#E8775A]">
                       {formatPrice(discountedPrice)}
                     </span>
                   </>
                 ) : (
-                  <span className="text-xl font-bold text-indigo-600">
-                    {formatPrice(originalPrice)}
+                  <span className="text-xl font-bold text-[#E8775A]">
+                    {formatPrice(effectivePrice)}
                   </span>
                 )}
               </div>
             </div>
+
+            {/* Variant Selector */}
+            {hasMultipleVariants && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Seleccionar opción</h3>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((variant) => {
+                    const variantDiscountedPrice = getDiscountedPrice(variant.price, discountPercentage)
+                    return (
+                      <button
+                        key={variant.id}
+                        onClick={() => setSelectedVariant(variant)}
+                        className={clsx(
+                          'px-4 py-2.5 rounded-xl border-2 transition-all text-left',
+                          selectedVariant?.id === variant.id
+                            ? 'border-[#E8775A] bg-[#E8775A]/10'
+                            : 'border-gray-200 hover:border-gray-300 active:bg-gray-50'
+                        )}
+                      >
+                        <div className="font-medium text-gray-900">{variant.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {formatPrice(variantDiscountedPrice)}
+                          {variant.stock <= 0 && (
+                            <span className="ml-2 text-amber-600 text-xs">(Agotado)</span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             <div className="mb-4">
@@ -145,25 +234,16 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               </p>
             </div>
 
-            {/* Category */}
-            {categoryInfo && (
-              <div className="mb-3">
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700">
-                  {categoryInfo.icon} {categoryInfo.name}
-                </span>
-              </div>
-            )}
-
             {/* Stock info */}
             <div className="flex flex-col gap-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium w-fit ${
-                product.stock > 10
+                effectiveStock > 10
                   ? 'bg-green-100 text-green-700'
-                  : product.stock > 0
+                  : effectiveStock > 0
                     ? 'bg-yellow-100 text-yellow-700'
                     : 'bg-amber-100 text-amber-700'
               }`}>
-                {isOutOfStock ? 'Pre-pedido disponible' : `${product.stock} disponibles`}
+                {isOutOfStock ? 'Pre-pedido disponible' : `${effectiveStock} disponibles`}
               </span>
 
               {/* Pre-order message for out of stock */}
@@ -188,19 +268,19 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
           {quantity > 0 ? (
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => updateQuantity(product.id, quantity - 1)}
+                onClick={() => updateQuantity(product.id, quantity - 1, selectedVariant?.id)}
                 className="w-14 h-14 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center transition-colors touch-target"
               >
                 <Minus className="w-6 h-6 text-gray-700" />
               </button>
               <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
               <button
-                onClick={() => addItem(product)}
+                onClick={handleAdd}
                 className={clsx(
                   "w-14 h-14 rounded-full flex items-center justify-center transition-colors touch-target",
                   isOutOfStock
                     ? "bg-amber-500 hover:bg-amber-400 active:bg-amber-600"
-                    : "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700"
+                    : "bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]"
                 )}
               >
                 <Plus className="w-6 h-6 text-white" />
@@ -209,11 +289,13 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
           ) : (
             <button
               onClick={handleAdd}
+              disabled={hasMultipleVariants && !selectedVariant}
               className={clsx(
                 'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target flex items-center justify-center gap-2',
                 isOutOfStock
                   ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600'
-                  : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700',
+                  : 'bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]',
+                (hasMultipleVariants && !selectedVariant) && 'opacity-50 cursor-not-allowed',
                 isAdding && 'scale-[1.02]'
               )}
             >

@@ -4,6 +4,9 @@
   :root {
     --background: #f9fafb;
     --foreground: #111827;
+    --primary: #f6a07a;
+    --primary-dark: #e58e6a;
+    --primary-light: #ffb599;
   }
 
   * {

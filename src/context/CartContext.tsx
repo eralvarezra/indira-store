@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
-import { Product, CartItem } from '@/types/database.types'
+import { Product, ProductVariant, CartItem, getDiscountedPrice, getEffectivePrice } from '@/types/database.types'
 
 interface CartState {
   items: CartItem[]
@@ -9,9 +9,9 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: Product }
-  | { type: 'REMOVE_ITEM'; payload: string }
-  | { type: 'UPDATE_QUANTITY'; payload: { productId: string; quantity: number } }
+  | { type: 'ADD_ITEM'; payload: { product: Product; variant?: ProductVariant } }
+  | { type: 'REMOVE_ITEM'; payload: { productId: string; variantId?: string } }
+  | { type: 'UPDATE_QUANTITY'; payload: { productId: string; variantId?: string; quantity: number } }
   | { type: 'CLEAR_CART' }
   | { type: 'TOGGLE_CART' }
   | { type: 'SET_CART'; payload: CartItem[] }
@@ -19,9 +19,9 @@ type CartAction =
 
 const CartContext = createContext<{
   state: CartState
-  addItem: (product: Product) => void
-  removeItem: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  addItem: (product: Product, variant?: ProductVariant) => void
+  removeItem: (productId: string, variantId?: string) => void
+  updateQuantity: (productId: string, quantity: number, variantId?: string) => void
   clearCart: () => void
   toggleCart: () => void
   closeCart: () => void
@@ -29,18 +29,26 @@ const CartContext = createContext<{
   totalPrice: number
 } | null>(null)
 
+// Helper to get unique cart item key
+function getCartItemKey(productId: string, variantId?: string): string {
+  return variantId ? `${productId}-${variantId}` : productId
+}
+
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const existingItem = state.items.find(
-        (item) => item.product.id === action.payload.id
+      const { product, variant } = action.payload
+      const itemKey = getCartItemKey(product.id, variant?.id)
+
+      const existingItem = state.items.find((item) =>
+        getCartItemKey(item.product.id, item.variant?.id) === itemKey
       )
 
       if (existingItem) {
         return {
           ...state,
           items: state.items.map((item) =>
-            item.product.id === action.payload.id
+            getCartItemKey(item.product.id, item.variant?.id) === itemKey
               ? { ...item, quantity: item.quantity + 1 }
               : item
           ),
@@ -49,22 +57,31 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       return {
         ...state,
-        items: [...state.items, { product: action.payload, quantity: 1 }],
+        items: [...state.items, { product, variant, quantity: 1 }],
       }
     }
 
-    case 'REMOVE_ITEM':
+    case 'REMOVE_ITEM': {
+      const { productId, variantId } = action.payload
+      const itemKey = getCartItemKey(productId, variantId)
+
       return {
         ...state,
-        items: state.items.filter((item) => item.product.id !== action.payload),
+        items: state.items.filter(
+          (item) => getCartItemKey(item.product.id, item.variant?.id) !== itemKey
+        ),
       }
+    }
 
     case 'UPDATE_QUANTITY': {
-      if (action.payload.quantity <= 0) {
+      const { productId, variantId, quantity } = action.payload
+      const itemKey = getCartItemKey(productId, variantId)
+
+      if (quantity <= 0) {
         return {
           ...state,
           items: state.items.filter(
-            (item) => item.product.id !== action.payload.productId
+            (item) => getCartItemKey(item.product.id, item.variant?.id) !== itemKey
           ),
         }
       }
@@ -72,8 +89,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         items: state.items.map((item) =>
-          item.product.id === action.payload.productId
-            ? { ...item, quantity: action.payload.quantity }
+          getCartItemKey(item.product.id, item.variant?.id) === itemKey
+            ? { ...item, quantity }
             : item
         ),
       }
@@ -122,19 +139,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.items))
   }, [state.items])
 
-  const addItem = (product: Product) => dispatch({ type: 'ADD_ITEM', payload: product })
-  const removeItem = (productId: string) => dispatch({ type: 'REMOVE_ITEM', payload: productId })
-  const updateQuantity = (productId: string, quantity: number) =>
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, quantity } })
+  const addItem = (product: Product, variant?: ProductVariant) =>
+    dispatch({ type: 'ADD_ITEM', payload: { product, variant } })
+  const removeItem = (productId: string, variantId?: string) =>
+    dispatch({ type: 'REMOVE_ITEM', payload: { productId, variantId } })
+  const updateQuantity = (productId: string, quantity: number, variantId?: string) =>
+    dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, variantId, quantity } })
   const clearCart = () => dispatch({ type: 'CLEAR_CART' })
   const toggleCart = () => dispatch({ type: 'TOGGLE_CART' })
   const closeCart = () => dispatch({ type: 'CLOSE_CART' })
 
   const totalItems = state.items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalPrice = state.items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  )
+  const totalPrice = state.items.reduce((sum, item) => {
+    const effectivePrice = getEffectivePrice(item.product, item.variant)
+    const discountedPrice = getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0)
+    return sum + discountedPrice * item.quantity
+  }, 0)
 
   return (
     <CartContext.Provider

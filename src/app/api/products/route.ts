@@ -1,26 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
-import { getProducts, createProduct } from '@/lib/demo-store'
+import { getProductsWithVariants, createProduct } from '@/lib/demo-store'
 
 export async function GET() {
   try {
     const supabase = getSupabase()
 
     if (!supabase) {
-      // Return demo products from memory
-      return NextResponse.json({ products: getProducts() })
+      // Return demo products with variants from memory
+      return NextResponse.json({ products: getProductsWithVariants() })
     }
 
-    const { data: products, error } = await supabase
+    // First try to get products with variants and images
+    const { data: productsWithVariants, error: variantsError } = await supabase
+      .from('products')
+      .select(`
+        *,
+        variants:product_variants(*),
+        images:product_images(*)
+      `)
+      .order('created_at', { ascending: false })
+
+    if (!variantsError && productsWithVariants) {
+      return NextResponse.json({ products: productsWithVariants })
+    }
+
+    // If variants query fails (table doesn't exist), fall back to products only
+    console.log('Variants query failed, falling back to products only:', variantsError)
+
+    const { data: products, error: productsError } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) {
+    if (productsError) {
       return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
     }
 
-    return NextResponse.json({ products })
+    // Return products with empty variants and images arrays
+    const productsWithEmptyArrays = (products || []).map(product => ({
+      ...(product as Record<string, unknown>),
+      variants: [],
+      images: []
+    }))
+
+    return NextResponse.json({ products: productsWithEmptyArrays })
   } catch (error) {
     console.error('Products fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
