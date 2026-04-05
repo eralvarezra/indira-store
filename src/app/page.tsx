@@ -6,63 +6,107 @@ import { ProductCard } from '@/components/product/ProductCard'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { FloatingCartButton } from '@/components/cart/FloatingCartButton'
 import { CheckoutModal } from '@/components/checkout/CheckoutModal'
-import { Product, SKINCARE_CATEGORIES, CategoryId } from '@/types/database.types'
-import { ShoppingBag, Loader2, Search } from 'lucide-react'
+import { Product, Category } from '@/types/database.types'
+import { ShoppingBag, Loader2, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import clsx from 'clsx'
 
 function CatalogContent() {
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId | 'all'>('all')
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string | 'all'>('all')
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | 'all'>('all')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
 
   useEffect(() => {
-    fetchProducts()
+    fetchData()
   }, [])
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/products')
-      const data = await response.json()
-      setProducts(data.products || [])
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/categories'),
+      ])
+
+      const productsData = await productsRes.json()
+      const categoriesData = await categoriesRes.json()
+
+      setProducts(productsData.products || [])
+      setCategories(categoriesData.categories || [])
     } catch (error) {
-      console.error('Error fetching products:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId)
+      } else {
+        newSet.add(categoryId)
+      }
+      return newSet
+    })
+  }
+
+  // Get all category IDs that have products
+  const categoryIdsWithProducts = new Set(
+    products.map(p => p.category).filter((c): c is string => !!c)
+  )
+
+  // Filter categories that have products (directly or through subcategories)
+  const categoriesWithProducts = categories.filter(category => {
+    if (categoryIdsWithProducts.has(category.id)) {
+      return true
+    }
+    if (category.subcategories) {
+      return category.subcategories.some(sub => categoryIdsWithProducts.has(sub.id))
+    }
+    return false
+  })
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+
+    let matchesCategory = true
+    if (selectedMainCategory !== 'all') {
+      const mainCategory = categoriesWithProducts.find(c => c.id === selectedMainCategory)
+      const subcategoryIds = mainCategory?.subcategories?.map(s => s.id) || []
+
+      if (selectedSubcategory !== 'all') {
+        matchesCategory = product.category_id === selectedSubcategory || product.category === selectedSubcategory
+      } else {
+        matchesCategory = product.category_id === selectedMainCategory ||
+                          subcategoryIds.includes(product.category_id || '') ||
+                          product.category === selectedMainCategory
+      }
+    }
+
     return matchesSearch && matchesCategory
   })
 
-  const productsByCategory = SKINCARE_CATEGORIES.map((category) => ({
-    ...category,
-    count: products.filter((p) => p.category === category.id).length,
-  }))
+  const productsCount = products.length
 
   return (
     <div className="min-h-screen bg-gray-50 safe-top">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-30 safe-top">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center mb-3">
             <a href="/" className="flex items-center">
               <img
                 src="/logo.png"
                 alt="Indira Store"
-                className="h-20 sm:h-24 md:h-28 lg:h-32 w-auto"
+                className="h-32 sm:h-40 md:h-48 lg:h-56 w-auto"
               />
-            </a>
-            <a
-              href="/admin/login"
-              className="text-sm text-gray-500 active:text-indigo-600 transition-colors px-3 py-2 touch-target"
-            >
-              Admin
             </a>
           </div>
 
@@ -74,41 +118,104 @@ function CatalogContent() {
               placeholder="Buscar productos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none transition-colors text-base"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors text-base"
             />
           </div>
         </div>
 
         {/* Categories */}
-        {!isLoading && products.length > 0 && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2">
+        {!isLoading && categoriesWithProducts.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3">
+            {/* Main Categories */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
               <button
-                onClick={() => setSelectedCategory('all')}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-target ${
-                  selectedCategory === 'all'
-                    ? 'bg-indigo-600 text-white'
+                onClick={() => {
+                  setSelectedMainCategory('all')
+                  setSelectedSubcategory('all')
+                }}
+                className={clsx(
+                  'flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-target',
+                  selectedMainCategory === 'all'
+                    ? 'bg-[#f6a07a] text-white'
                     : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-                }`}
+                )}
               >
-                Todos ({products.length})
+                Todos ({productsCount})
               </button>
-              {productsByCategory
-                .filter((cat) => cat.count > 0)
-                .map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-target ${
-                      selectedCategory === category.id
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-                    }`}
-                  >
-                    {category.icon} {category.name} ({category.count})
-                  </button>
-                ))}
+              {categoriesWithProducts.map((category) => {
+                const isExpanded = expandedCategories.has(category.id)
+                const isSelected = selectedMainCategory === category.id
+                // Filter subcategories to only show those with products
+                const subcategoriesWithProducts = category.subcategories?.filter(sub =>
+                  categoryIdsWithProducts.has(sub.id)
+                ) || []
+
+                return (
+                  <div key={category.id} className="flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        setSelectedMainCategory(category.id)
+                        setSelectedSubcategory('all')
+                        toggleCategory(category.id)
+                      }}
+                      className={clsx(
+                        'flex items-center gap-1 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-target',
+                        isSelected
+                          ? 'bg-[#f6a07a] text-white'
+                          : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                      )}
+                    >
+                      {category.icon && <span>{category.icon}</span>}
+                      {category.name}
+                      {subcategoriesWithProducts.length > 0 && (
+                        isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
+
+            {/* Subcategories */}
+            {selectedMainCategory !== 'all' && (() => {
+              const selectedCat = categoriesWithProducts.find(c => c.id === selectedMainCategory)
+              const subcats = selectedCat?.subcategories?.filter(sub =>
+                categoryIdsWithProducts.has(sub.id)
+              ) || []
+
+              if (subcats.length === 0) return null
+
+              return (
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pt-1">
+                  <button
+                    onClick={() => setSelectedSubcategory('all')}
+                    className={clsx(
+                      'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-target',
+                      selectedSubcategory === 'all'
+                        ? 'bg-[#E8775A] text-white'
+                        : 'bg-gray-50 text-gray-600 active:bg-gray-100'
+                    )}
+                  >
+                    Todos
+                  </button>
+                  {subcats.map((subcat) => (
+                    <button
+                      key={subcat.id}
+                      onClick={() => setSelectedSubcategory(subcat.id)}
+                      className={clsx(
+                        'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-target',
+                        selectedSubcategory === subcat.id
+                          ? 'bg-[#E8775A] text-white'
+                          : 'bg-gray-50 text-gray-600 active:bg-gray-100'
+                      )}
+                    >
+                      {subcat.icon && <span className="mr-1">{subcat.icon}</span>}
+                      {subcat.name}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         )}
       </header>
@@ -117,7 +224,7 @@ function CatalogContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-28">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+            <Loader2 className="w-10 h-10 animate-spin text-[#f6a07a]" />
             <p className="mt-4 text-gray-500">Cargando productos...</p>
           </div>
         ) : products.length === 0 ? (
@@ -136,12 +243,15 @@ function CatalogContent() {
               <div className="flex flex-col items-center justify-center py-12">
                 <p className="text-gray-500">No se encontraron productos para "{searchQuery}"</p>
               </div>
-            ) : selectedCategory !== 'all' && filteredProducts.length === 0 ? (
+            ) : selectedMainCategory !== 'all' && filteredProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <p className="text-gray-500">No hay productos en esta categoría</p>
                 <button
-                  onClick={() => setSelectedCategory('all')}
-                  className="mt-2 text-indigo-600 font-medium"
+                  onClick={() => {
+                    setSelectedMainCategory('all')
+                    setSelectedSubcategory('all')
+                  }}
+                  className="mt-2 text-[#E8775A] font-medium"
                 >
                   Ver todos los productos
                 </button>
@@ -150,10 +260,13 @@ function CatalogContent() {
               <>
                 <p className="text-sm text-gray-500 mb-3 px-1">
                   {filteredProducts.length} {filteredProducts.length === 1 ? 'producto' : 'productos'}
-                  {selectedCategory !== 'all' && (
-                    <span className="text-indigo-600">
+                  {selectedMainCategory !== 'all' && (
+                    <span className="text-[#E8775A]">
                       {' '}
-                      en {SKINCARE_CATEGORIES.find((c) => c.id === selectedCategory)?.name}
+                      en {categoriesWithProducts.find(c => c.id === selectedMainCategory)?.name}
+                      {selectedSubcategory !== 'all' && (
+                        <> / {categoriesWithProducts.find(c => c.id === selectedMainCategory)?.subcategories?.find(s => s.id === selectedSubcategory)?.name}</>
+                      )}
                     </span>
                   )}
                 </p>
