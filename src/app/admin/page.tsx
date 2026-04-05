@@ -14,6 +14,7 @@ interface OrderWithExtras extends Order {
   total_with_shipping?: number | null
   amount_paid?: number
   advance_payment?: number | null
+  shipping_cost?: number
 }
 
 interface WeekCycle {
@@ -1125,10 +1126,35 @@ export default function AdminDashboard() {
                     const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
                     const totalWithShipping = orderWithExtras.total_with_shipping || order.total || 0
                     const amountPaid = orderWithExtras.amount_paid || 0
-                    const advancePayment = orderWithExtras.advance_payment || (hasPreOrder ? Math.ceil(totalWithShipping * 0.5) : totalWithShipping)
+
+                    // Calculate advance payment correctly:
+                    // - In-stock items: 100%
+                    // - Pre-order items: 50%
+                    // - Shipping: 100%
+                    let calculatedAdvancePayment = 0
+                    for (const item of orderItems) {
+                      const itemTotal = item.price * item.quantity
+                      if (item.type === 'pre_order') {
+                        calculatedAdvancePayment += itemTotal * 0.5 // 50% for pre-orders
+                      } else {
+                        calculatedAdvancePayment += itemTotal // 100% for in-stock
+                      }
+                    }
+                    // Add shipping cost (stored separately, need to get from order)
+                    const shippingCost = (order as OrderWithExtras).shipping_cost || 0
+                    calculatedAdvancePayment += shippingCost
+                    calculatedAdvancePayment = Math.ceil(calculatedAdvancePayment)
+
+                    const advancePayment = orderWithExtras.advance_payment || calculatedAdvancePayment
                     const remainingPayment = totalWithShipping - amountPaid
                     const isFullyPaid = amountPaid >= totalWithShipping
                     const needsAdvance = hasPreOrder && amountPaid < advancePayment
+                    const inStockTotal = orderItems
+                      .filter(item => item.type !== 'pre_order')
+                      .reduce((sum, item) => sum + item.price * item.quantity, 0)
+                    const preOrderTotal = orderItems
+                      .filter(item => item.type === 'pre_order')
+                      .reduce((sum, item) => sum + item.price * item.quantity, 0)
 
                     return (
                       <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -1198,7 +1224,34 @@ export default function AdminDashboard() {
                             {/* Payment progress for pre-orders */}
                             {hasPreOrder && order.status === 'pending' && (
                               <div className="mt-3 pt-3 border-t border-gray-200">
-                                <div className="flex justify-between text-sm mb-1">
+                                {/* Payment breakdown */}
+                                <div className="space-y-1 text-sm mb-2">
+                                  {inStockTotal > 0 && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Productos disponibles (100%):</span>
+                                      <span className="text-green-600">{formatPrice(inStockTotal)}</span>
+                                    </div>
+                                  )}
+                                  {preOrderTotal > 0 && (
+                                    <>
+                                      <div className="flex justify-between text-gray-600">
+                                        <span>Pre-pedido - Adelanto (50%):</span>
+                                        <span className="text-amber-600">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                                      </div>
+                                      <div className="flex justify-between text-gray-400 text-xs">
+                                        <span>Pre-pedido - Restante:</span>
+                                        <span>{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {shippingCost > 0 && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Envío:</span>
+                                      <span>{formatPrice(shippingCost)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex justify-between text-sm mb-1 pt-2 border-t border-gray-200">
                                   <span className="text-gray-600">Pagado:</span>
                                   <span className={isFullyPaid ? 'text-green-600 font-medium' : 'text-gray-900'}>
                                     {formatPrice(amountPaid)} / {formatPrice(totalWithShipping)}
@@ -1215,9 +1268,9 @@ export default function AdminDashboard() {
                                 </div>
                                 {!isFullyPaid && (
                                   <div className="flex justify-between text-xs text-gray-500">
-                                    <span>Adelanto mínimo: {formatPrice(advancePayment)}</span>
+                                    <span>Pago inicial requerido: {formatPrice(advancePayment)}</span>
                                     <span className={clsx(amountPaid >= advancePayment ? 'text-green-600' : 'text-amber-600')}>
-                                      {amountPaid >= advancePayment ? '✓ Adelanto completo' : `Falta: ${formatPrice(advancePayment - amountPaid)}`}
+                                      {amountPaid >= advancePayment ? '✓ Pago inicial completo' : `Falta: ${formatPrice(advancePayment - amountPaid)}`}
                                     </span>
                                   </div>
                                 )}

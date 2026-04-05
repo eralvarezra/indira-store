@@ -141,8 +141,21 @@ export async function POST(request: NextRequest) {
     // Check if this is a pre-order (contains any pre-order items)
     const hasPreOrderItems = processedItems.some(item => item.type === 'pre_order')
 
-    // Calculate advance payment: 50% for pre-orders, 100% for regular orders
-    const advancePayment = hasPreOrderItems ? Math.ceil(totalWithShipping * 0.5) : totalWithShipping
+    // Calculate advance payment correctly:
+    // - In-stock items: 100% of their value
+    // - Pre-order items: 50% of their value (adelanto)
+    // - Shipping: 100% always
+    let advancePayment = 0
+    for (const item of processedItems) {
+      const itemTotal = item.price * item.quantity
+      if (item.type === 'pre_order') {
+        advancePayment += itemTotal * 0.5 // 50% for pre-orders
+      } else {
+        advancePayment += itemTotal // 100% for in-stock items
+      }
+    }
+    advancePayment += body.shipping_cost // Shipping is always 100%
+    advancePayment = Math.ceil(advancePayment) // Round up
 
     // Generate order number
     const orderNumber = await generateOrderNumber(supabase)
@@ -329,6 +342,7 @@ interface TelegramNotification extends OrderRequest {
   orderNumber: string
   totalWithShipping: number
   isPreOrder: boolean
+  advancePayment?: number
 }
 
 async function sendTelegramNotification(order: TelegramNotification) {
@@ -345,6 +359,21 @@ async function sendTelegramNotification(order: TelegramNotification) {
   // Separate items by type
   const inStockItems = order.items.filter(item => item.type === 'in_stock')
   const preOrderItems = order.items.filter(item => item.type === 'pre_order')
+
+  // Calculate totals by type
+  const inStockTotal = inStockItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const preOrderTotal = preOrderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+  // Calculate advance payment correctly
+  let calculatedAdvance = 0
+  for (const item of inStockItems) {
+    calculatedAdvance += item.price * item.quantity // 100% for in-stock
+  }
+  for (const item of preOrderItems) {
+    calculatedAdvance += item.price * item.quantity * 0.5 // 50% for pre-order
+  }
+  calculatedAdvance += order.shipping_cost // Shipping is 100%
+  const advancePayment = order.advancePayment || Math.ceil(calculatedAdvance)
 
   const formatItems = (items: OrderItem[], typeLabel: string) =>
     items.map(item => `• ${item.name} x${item.quantity} (${typeLabel})`).join('\n')
@@ -363,10 +392,21 @@ async function sendTelegramNotification(order: TelegramNotification) {
     ? '📦 Recoger en tienda'
     : `🚚 ${shippingMethod.name} - ${order.province}, ${order.canton}, ${order.district}`
 
-  // Payment status for pre-orders
-  const paymentInfo = order.isPreOrder
-    ? `\n\n⚠️ *PRE-PEDIDO DETECTADO*\n💰 *Adelanto requerido (50%):* ₡${order.advancePayment?.toFixed(2) || (order.totalWithShipping * 0.5).toFixed(2)}\n💵 *Restante:* ₡${((order.totalWithShipping * 0.5)).toFixed(2)}`
-    : ''
+  // Build payment breakdown for mixed orders
+  let paymentBreakdown = ''
+  if (order.isPreOrder) {
+    const remainingPayment = Math.ceil(order.totalWithShipping - advancePayment)
+    paymentBreakdown = `
+⚠️ *PEDIDO CON PRE-ORDEN*
+
+📊 *Desglose de pago:*
+${inStockItems.length > 0 ? `• Productos disponibles (100%): ₡${inStockTotal.toFixed(2)}\n` : ''}• Pre-pedido adelanto (50%): ₡${Math.ceil(preOrderTotal * 0.5).toFixed(2)}
+• Pre-pedido restante: ₡${Math.ceil(preOrderTotal * 0.5).toFixed(2)}
+• Envío: ${order.shipping_cost === 0 ? 'Gratis' : `₡${order.shipping_cost.toFixed(2)}`}
+
+💰 *PAGO INICIAL REQUERIDO:* ₡${advancePayment.toFixed(2)}
+💵 *Pagar al entregar:* ₡${remainingPayment.toFixed(2)}`
+  }
 
   // Build notification message
   const message = `
@@ -379,8 +419,7 @@ async function sendTelegramNotification(order: TelegramNotification) {
 ${order.email ? `📧 *Email:* ${order.email}` : ''}
 
 📦 *Productos:*
-${itemsList}
-📊 *Cantidad:* ${totalItems} artículos
+${itemsList}📊 *Cantidad:* ${totalItems} artículos
 💰 *Subtotal:* ₡${order.total.toFixed(2)}
 
 🚚 *Envío:* ${shippingInfo}
@@ -389,7 +428,7 @@ ${itemsList}
 💰 *TOTAL:* ₡${order.totalWithShipping.toFixed(2)}
 
 💳 *Método de pago:* ${order.payment_method || 'No especificado'}
-${order.isPreOrder ? `\n💸 *Adelanto requerido:* ₡${order.advancePayment?.toFixed(2) || (order.totalWithShipping * 0.5).toFixed(2)} (50%)` : ''}
+${paymentBreakdown}
 
 ${order.shipping_method !== 'pickup' ? `
 📍 *Dirección de entrega:*
@@ -403,8 +442,7 @@ ${order.billing_name}
 ${order.billing_exact_address}
 ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
 ` : ''}
-${paymentInfo}
-⚡ *Acción:* Contactar cliente para confirmar${order.isPreOrder ? ' y recibir adelanto.' : '.'}
+⚡ *Acción:* Contactar cliente para confirmar${order.isPreOrder ? ' y recibir pago inicial.' : '.'}
   `.trim()
 
   try {

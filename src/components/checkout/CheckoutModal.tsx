@@ -114,6 +114,36 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     return stock <= 0
   })
 
+  // Calculate advance payment:
+  // - In-stock items: 100% of their value
+  // - Pre-order items: 50% of their value (adelanto)
+  // - Shipping: 100% always
+  const hasPreOrderItems = preOrderItems.length > 0
+  const calculateAdvancePayment = () => {
+    let advance = 0
+
+    // In-stock items: 100%
+    for (const item of inStockItems) {
+      const price = getEffectivePrice(item.product, item.variant)
+      const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+      advance += discountedPrice * item.quantity
+    }
+
+    // Pre-order items: 50%
+    for (const item of preOrderItems) {
+      const price = getEffectivePrice(item.product, item.variant)
+      const discountedPrice = getDiscountedPrice(price, item.product.discount_percentage || 0)
+      advance += discountedPrice * item.quantity * 0.5
+    }
+
+    // Shipping: 100%
+    advance += shippingCost
+
+    return Math.ceil(advance)
+  }
+  const advancePaymentAmount = calculateAdvancePayment()
+  const remainingPaymentAmount = totalWithShipping - advancePaymentAmount
+
   const validatePhone = (phone: string, countryCode: string) => {
     const country = countries.find(c => c.code === countryCode)
     if (!country) return phone.length >= 8
@@ -346,23 +376,27 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-amber-800 mb-1">Este es un pre-pedido</p>
-                    <p className="text-sm text-amber-700 mb-2">
-                      Tu pedido contiene productos que no están en stock actualmente.
+                  <div className="flex-1">
+                    <p className="font-semibold text-amber-800 mb-1">Pedido con productos de pre-orden</p>
+                    <p className="text-sm text-amber-700 mb-3">
+                      Tu pedido contiene productos que no están en stock. Se requiere un adelanto para procesarlo.
                     </p>
                     <div className="bg-white rounded-lg p-3 space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Adelanto requerido (50%):</span>
-                        <span className="font-bold text-amber-600">{formatPrice(orderConfirmation.advancePayment)}</span>
+                        <span className="text-gray-600">Productos disponibles (100%):</span>
+                        <span className="font-medium text-green-600">{formatPrice(orderConfirmation.advancePayment - (orderConfirmation.totalWithShipping - orderConfirmation.advancePayment))}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Restante al entregar:</span>
-                        <span className="font-medium text-gray-900">{formatPrice(orderConfirmation.totalWithShipping - orderConfirmation.advancePayment)}</span>
+                        <span className="text-gray-600">Adelanto pre-pedido (50%):</span>
+                        <span className="font-medium text-amber-600">{formatPrice(orderConfirmation.totalWithShipping - orderConfirmation.advancePayment)}</span>
                       </div>
-                      <div className="border-t border-gray-100 pt-2 flex justify-between">
-                        <span className="text-gray-900 font-medium">Total:</span>
-                        <span className="font-bold text-gray-900">{formatPrice(orderConfirmation.totalWithShipping)}</span>
+                      <div className="border-t border-gray-200 pt-2 flex justify-between font-bold">
+                        <span className="text-gray-900">Pagas ahora:</span>
+                        <span className="text-amber-600">{formatPrice(orderConfirmation.advancePayment)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>Pagas al recibir:</span>
+                        <span>{formatPrice(orderConfirmation.totalWithShipping - orderConfirmation.advancePayment)}</span>
                       </div>
                     </div>
                   </div>
