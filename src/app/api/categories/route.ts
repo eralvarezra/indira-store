@@ -34,8 +34,24 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
     }
 
-    // Return flat array of all categories
-    return NextResponse.json({ categories: allCategories || [] })
+    // Organize into parent-child structure
+    // Parent categories have parent_id: null
+    // Subcategories have parent_id pointing to their parent
+    const parentCategories = (allCategories || []).filter(cat => !cat.parent_id)
+    const subcategories = (allCategories || []).filter(cat => cat.parent_id)
+
+    // Build hierarchical structure
+    const categoriesWithSubcategories = parentCategories.map(parent => ({
+      ...parent,
+      subcategories: subcategories
+        .filter(sub => sub.parent_id === parent.id)
+        .map(sub => ({
+          ...sub,
+          subcategories: [] // Subcategories don't have nested subcategories
+        }))
+    }))
+
+    return NextResponse.json({ categories: categoriesWithSubcategories })
   } catch (error) {
     console.error('Categories fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
