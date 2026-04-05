@@ -454,13 +454,13 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   <strong>Para darle seguimiento a tu pedido, contáctanos:</strong>
                 </p>
                 <a
-                  href="https://wa.me/50686739930"
+                  href="https://wa.me/50664280436"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
                 >
                   <MessageCircle className="w-5 h-5" />
-                  <span>WhatsApp: +506 8673 9930</span>
+                  <span>WhatsApp: +506 6428 0436</span>
                 </a>
                 <p className="text-sm text-gray-500 mt-2">
                   Envíanos tu número de orden: <span className="font-mono font-bold text-gray-900">{orderConfirmation.orderNumber}</span>
