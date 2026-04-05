@@ -47,6 +47,11 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<ProductWithVariants[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [settings, setSettings] = useState({ telegram_bot_token: '', telegram_chat_id: '' })
+  const [shippingInstructions, setShippingInstructions] = useState({
+    pickup: 'Nuestro horario de atención es de Lunes a Viernes de 9:00 AM a 6:00 PM y Sábados de 9:00 AM a 3:00 PM.',
+    gam: 'El paquete será entregado en la dirección indicada en 2-3 días hábiles.',
+    outside_gam: 'El paquete será entregado en la dirección indicada en 3-5 días hábiles.'
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [showProductModal, setShowProductModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -82,6 +87,7 @@ export default function AdminDashboard() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [orderForm, setOrderForm] = useState({ customer_name: '', phone: '' })
   const [orderSearch, setOrderSearch] = useState('')
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false)
   const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -131,13 +137,14 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const [productsRes, ordersRes, settingsRes, cyclesRes, categoriesRes, paymentMethodsRes] = await Promise.all([
+      const [productsRes, ordersRes, settingsRes, cyclesRes, categoriesRes, paymentMethodsRes, shippingInstructionsRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/orders'),
         fetch('/api/admin/settings'),
         fetch('/api/week-cycles'),
         fetch('/api/categories'),
         fetch('/api/admin/payment-methods'),
+        fetch('/api/admin/shipping-instructions'),
       ])
 
       if (productsRes.ok) {
@@ -168,6 +175,11 @@ export default function AdminDashboard() {
       if (paymentMethodsRes.ok) {
         const data = await paymentMethodsRes.json()
         setPaymentMethods(data.paymentMethods || [])
+      }
+
+      if (shippingInstructionsRes.ok) {
+        const data = await shippingInstructionsRes.json()
+        setShippingInstructions(data.instructions || shippingInstructions)
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -360,6 +372,22 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Error saving settings:', error)
+    }
+  }
+
+  const handleSaveShippingInstructions = async () => {
+    try {
+      const response = await fetch('/api/admin/shipping-instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructions: shippingInstructions }),
+      })
+
+      if (response.ok) {
+        alert('Instrucciones de envío guardadas correctamente')
+      }
+    } catch (error) {
+      console.error('Error saving shipping instructions:', error)
     }
   }
 
@@ -794,19 +822,12 @@ export default function AdminDashboard() {
     }
   }
 
-  // Filter orders by week cycle and search
-  const filteredOrders = (selectedCycleId === 'all'
-    ? orders
-    : orders.filter(order => order.week_cycle_id === selectedCycleId)
-  ).filter(order => {
+  // Filter orders by order number search
+  const filteredOrders = orders.filter(order => {
     if (!orderSearch) return true
     const search = orderSearch.toLowerCase()
     const orderWithExtras = order as OrderWithExtras
-    return (
-      orderWithExtras.order_number?.toLowerCase().includes(search) ||
-      order.customer_name.toLowerCase().includes(search) ||
-      order.phone.toLowerCase().includes(search)
-    )
+    return orderWithExtras.order_number?.toLowerCase().includes(search)
   })
 
   // Handler for adding payment
@@ -935,6 +956,18 @@ export default function AdminDashboard() {
     return new Date(date).toLocaleString('es-CR', {
       dateStyle: 'short',
       timeStyle: 'short',
+    })
+  }
+
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId)
+      } else {
+        newSet.add(orderId)
+      }
+      return newSet
     })
   }
 
@@ -1094,28 +1127,11 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Buscar por #orden, nombre o teléfono"
+                      placeholder="Buscar por número de orden"
                       value={orderSearch}
                       onChange={(e) => setOrderSearch(e.target.value)}
                       className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none w-64"
                     />
-                    {/* Week Cycle Filter */}
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <select
-                        value={selectedCycleId}
-                        onChange={(e) => setSelectedCycleId(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
-                      >
-                        <option value="all">Todos los pedidos</option>
-                        {weekCycles.map((cycle) => (
-                          <option key={cycle.id} value={cycle.id}>
-                            {new Date(cycle.start_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
-                            {cycle.status === 'open' ? ' (Actual)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -1156,44 +1172,65 @@ export default function AdminDashboard() {
                       .filter(item => item.type === 'pre_order')
                       .reduce((sum, item) => sum + item.price * item.quantity, 0)
 
+                    const isExpanded = expandedOrders.has(order.id)
+
                     return (
                       <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-mono text-gray-400">#{orderNumber}</span>
+                        {/* Collapsed Header - Always visible */}
+                        <div
+                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => toggleOrderExpand(order.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-mono font-medium text-gray-700">#{orderNumber}</span>
                                 {hasPreOrder && (
                                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                                     Pre-pedido
                                   </span>
                                 )}
                               </div>
-                              <h3 className="font-semibold text-gray-900">{order.customer_name}</h3>
-                              <p className="text-sm text-gray-500">{order.phone}</p>
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-gray-900">{order.customer_name}</span>
+                                <span className="text-sm text-gray-500">{order.phone}</span>
+                              </div>
                             </div>
-                            <div className="text-right flex items-start gap-2">
+                            <div className="flex items-center gap-3">
+                              <span className={clsx(
+                                'px-3 py-1 rounded-full text-xs font-medium',
+                                order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
+                                order.status === 'confirmed' && 'bg-green-100 text-green-700',
+                                order.status === 'cancelled' && 'bg-red-100 text-red-700'
+                              )}>
+                                {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Entregado' : 'Cancelado'}
+                              </span>
+                              <span className="font-semibold text-[#E8775A]">{formatPrice(totalWithShipping)}</span>
+                              <ChevronDown className={clsx(
+                                'w-5 h-5 text-gray-400 transition-transform',
+                                isExpanded && 'transform rotate-180'
+                              )} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded Content */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-100 p-4">
+                            <div className="flex items-start justify-between mb-3">
                               <div>
-                                <span className={clsx(
-                                  'px-3 py-1 rounded-full text-xs font-medium',
-                                  order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
-                                  order.status === 'confirmed' && 'bg-green-100 text-green-700',
-                                  order.status === 'cancelled' && 'bg-red-100 text-red-700'
-                                )}>
-                                  {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Entregado' : 'Cancelado'}
-                                </span>
-                                <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
+                                <p className="text-sm text-gray-500">{formatDate(order.created_at)}</p>
                               </div>
                               <div className="flex gap-1">
                                 <button
-                                  onClick={() => openEditOrderModal(order)}
+                                  onClick={(e) => { e.stopPropagation(); openEditOrderModal(order) }}
                                   className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                                   title="Editar pedido"
                                 >
                                   <Edit2 className="w-4 h-4 text-gray-500" />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteOrder(order.id)}
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id) }}
                                   className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
                                   title="Eliminar pedido"
                                 >
@@ -1201,159 +1238,157 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                             </div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            {orderItems.map((item, index) => (
-                              <div key={index} className="flex items-center justify-between text-sm py-1">
-                                <span className="flex items-center gap-2">
-                                  {item.name} x{item.quantity}
-                                  {item.type === 'pre_order' && (
-                                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
-                                      Pre-pedido
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
-                              </div>
-                            ))}
-                            <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
-                              <span>Total</span>
-                              <span className="text-[#E8775A]">{formatPrice(totalWithShipping)}</span>
-                            </div>
-
-                            {/* Payment progress for pre-orders */}
-                            {hasPreOrder && order.status === 'pending' && (
-                              <div className="mt-3 pt-3 border-t border-gray-200">
-                                {/* Payment breakdown */}
-                                <div className="space-y-1 text-sm mb-2">
-                                  {inStockTotal > 0 && (
-                                    <div className="flex justify-between text-gray-600">
-                                      <span>Productos disponibles (100%):</span>
-                                      <span className="text-green-600">{formatPrice(inStockTotal)}</span>
-                                    </div>
-                                  )}
-                                  {preOrderTotal > 0 && (
-                                    <>
-                                      <div className="flex justify-between text-gray-600">
-                                        <span>Pre-pedido - Adelanto (50%):</span>
-                                        <span className="text-amber-600">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
-                                      </div>
-                                      <div className="flex justify-between text-gray-400 text-xs">
-                                        <span>Pre-pedido - Restante:</span>
-                                        <span>{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
-                                      </div>
-                                    </>
-                                  )}
-                                  {shippingCost > 0 && (
-                                    <div className="flex justify-between text-gray-600">
-                                      <span>Envío:</span>
-                                      <span>{formatPrice(shippingCost)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex justify-between text-sm mb-1 pt-2 border-t border-gray-200">
-                                  <span className="text-gray-600">Pagado:</span>
-                                  <span className={isFullyPaid ? 'text-green-600 font-medium' : 'text-gray-900'}>
-                                    {formatPrice(amountPaid)} / {formatPrice(totalWithShipping)}
-                                  </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                                  <div
-                                    className={clsx(
-                                      'h-2 rounded-full transition-all',
-                                      isFullyPaid ? 'bg-green-500' : amountPaid >= advancePayment ? 'bg-amber-500' : 'bg-red-500'
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              {orderItems.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between text-sm py-1">
+                                  <span className="flex items-center gap-2">
+                                    {item.name} x{item.quantity}
+                                    {item.type === 'pre_order' && (
+                                      <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
+                                        Pre-pedido
+                                      </span>
                                     )}
-                                    style={{ width: `${Math.min((amountPaid / totalWithShipping) * 100, 100)}%` }}
-                                  />
+                                  </span>
+                                  <span className="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
                                 </div>
-                                {!isFullyPaid && (
-                                  <div className="flex justify-between text-xs text-gray-500">
-                                    <span>Pago inicial requerido: {formatPrice(advancePayment)}</span>
-                                    <span className={clsx(amountPaid >= advancePayment ? 'text-green-600' : 'text-amber-600')}>
-                                      {amountPaid >= advancePayment ? '✓ Pago inicial completo' : `Falta: ${formatPrice(advancePayment - amountPaid)}`}
+                              ))}
+                              <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
+                                <span>Total</span>
+                                <span className="text-[#E8775A]">{formatPrice(totalWithShipping)}</span>
+                              </div>
+
+                              {/* Payment progress for pre-orders */}
+                              {hasPreOrder && order.status === 'pending' && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  {/* Payment breakdown */}
+                                  <div className="space-y-1 text-sm mb-2">
+                                    {inStockTotal > 0 && (
+                                      <div className="flex justify-between text-gray-600">
+                                        <span>Productos disponibles (100%):</span>
+                                        <span className="text-green-600">{formatPrice(inStockTotal)}</span>
+                                      </div>
+                                    )}
+                                    {preOrderTotal > 0 && (
+                                      <>
+                                        <div className="flex justify-between text-gray-600">
+                                          <span>Pre-pedido - Adelanto (50%):</span>
+                                          <span className="text-amber-600">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                                        </div>
+                                        <div className="flex justify-between text-gray-400 text-xs">
+                                          <span>Pre-pedido - Restante:</span>
+                                          <span>{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                                        </div>
+                                      </>
+                                    )}
+                                    {shippingCost > 0 && (
+                                      <div className="flex justify-between text-gray-600">
+                                        <span>Envío:</span>
+                                        <span>{formatPrice(shippingCost)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex justify-between text-sm mb-1 pt-2 border-t border-gray-200">
+                                    <span className="text-gray-600">Pagado:</span>
+                                    <span className={isFullyPaid ? 'text-green-600 font-medium' : 'text-gray-900'}>
+                                      {formatPrice(amountPaid)} / {formatPrice(totalWithShipping)}
                                     </span>
                                   </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                    <div
+                                      className={clsx(
+                                        'h-2 rounded-full transition-all',
+                                        isFullyPaid ? 'bg-green-500' : amountPaid >= advancePayment ? 'bg-amber-500' : 'bg-red-500'
+                                      )}
+                                      style={{ width: `${Math.min((amountPaid / totalWithShipping) * 100, 100)}%` }}
+                                    />
+                                  </div>
+                                  {!isFullyPaid && (
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                      <span>Pago inicial requerido: {formatPrice(advancePayment)}</span>
+                                      <span className={clsx(amountPaid >= advancePayment ? 'text-green-600' : 'text-amber-600')}>
+                                        {amountPaid >= advancePayment ? '✓ Pago inicial completo' : `Falta: ${formatPrice(advancePayment - amountPaid)}`}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Payment Proof */}
+                              {(order as OrderWithExtras).payment_proof_url && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <p className="text-sm text-gray-600 mb-2">Comprobante de pago:</p>
+                                  <a
+                                    href={(order as OrderWithExtras).payment_proof_url!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={(order as OrderWithExtras).payment_proof_url!}
+                                      alt="Comprobante de pago"
+                                      className="max-w-full h-32 object-contain rounded-lg border border-gray-200 hover:border-[#E8775A] transition-colors cursor-pointer"
+                                    />
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            {order.status === 'pending' && (
+                              <div className="flex gap-2 mt-4">
+                                {hasPreOrder && !isFullyPaid && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setPaymentOrderId(order.id); setShowAddPaymentModal(true) }}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                                  >
+                                    <CreditCard className="w-4 h-4" />
+                                    Agregar Pago
+                                  </button>
                                 )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (hasPreOrder && !isFullyPaid) {
+                                      alert('Este pedido requiere el pago completo antes de ser entregado.')
+                                      return
+                                    }
+                                    handleMarkDelivered(order.id)
+                                  }}
+                                  className={clsx(
+                                    'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                    hasPreOrder && !isFullyPaid
+                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                      : 'bg-green-600 text-white hover:bg-green-700'
+                                  )}
+                                >
+                                  <Check className="w-4 h-4" />
+                                  Entregado
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'cancelled') }}
+                                  className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                  Cancelar
+                                </button>
                               </div>
                             )}
 
-                          {/* Payment Proof */}
-                          {(order as OrderWithExtras).payment_proof_url && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <p className="text-sm text-gray-600 mb-2">Comprobante de pago:</p>
-                              <a
-                                href={(order as OrderWithExtras).payment_proof_url!}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                              >
-                                <img
-                                  src={(order as OrderWithExtras).payment_proof_url!}
-                                  alt="Comprobante de pago"
-                                  className="max-w-full h-32 object-contain rounded-lg border border-gray-200 hover:border-[#E8775A] transition-colors cursor-pointer"
-                                />
-                              </a>
-                            </div>
-                          )}
+                            {order.status === 'confirmed' && (
+                              <div className="flex items-center gap-2 mt-4 p-3 bg-green-50 rounded-lg">
+                                <Check className="w-5 h-5 text-green-600" />
+                                <span className="text-sm text-green-700">Pedido entregado - Stock actualizado</span>
+                              </div>
+                            )}
+
+                            {order.status === 'cancelled' && (
+                              <div className="flex items-center gap-2 mt-4 p-3 bg-red-50 rounded-lg">
+                                <XCircle className="w-5 h-5 text-red-600" />
+                                <span className="text-sm text-red-700">Pedido cancelado - Stock devuelto</span>
+                              </div>
+                            )}
                           </div>
-
-                          {/* Action Buttons */}
-                          {order.status === 'pending' && (
-                            <div className="flex gap-2 mt-4">
-                              {hasPreOrder && !isFullyPaid && (
-                                <button
-                                  onClick={() => {
-                                    setPaymentOrderId(order.id)
-                                    setShowAddPaymentModal(true)
-                                  }}
-                                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
-                                >
-                                  <CreditCard className="w-4 h-4" />
-                                  Agregar Pago
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  if (hasPreOrder && !isFullyPaid) {
-                                    alert('Este pedido requiere el pago completo antes de ser entregado.')
-                                    return
-                                  }
-                                  handleMarkDelivered(order.id)
-                                }}
-                                className={clsx(
-                                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                  hasPreOrder && !isFullyPaid
-                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                    : 'bg-green-600 text-white hover:bg-green-700'
-                                )}
-                              >
-                                <Check className="w-4 h-4" />
-                                Entregado
-                              </button>
-                              <button
-                                onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                              >
-                                <XCircle className="w-4 h-4" />
-                                Cancelar
-                              </button>
-                            </div>
-                          )}
-
-                          {order.status === 'confirmed' && (
-                            <div className="flex items-center gap-2 mt-4 p-3 bg-green-50 rounded-lg">
-                              <Check className="w-5 h-5 text-green-600" />
-                              <span className="text-sm text-green-700">Pedido entregado - Stock actualizado</span>
-                            </div>
-                          )}
-
-                          {order.status === 'cancelled' && (
-                            <div className="flex items-center gap-2 mt-4 p-3 bg-red-50 rounded-lg">
-                              <XCircle className="w-5 h-5 text-red-600" />
-                              <span className="text-sm text-red-700">Pedido cancelado - Stock devuelto</span>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     )
                   })}
@@ -2140,6 +2175,65 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Shipping Instructions */}
+                  <div className="max-w-2xl">
+                    <h2 className="text-lg font-semibold mb-4">Instrucciones de Envío</h2>
+                    <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
+                      {/* Pickup */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Recoger en tienda
+                        </label>
+                        <p className="text-xs text-gray-500 mb-2">Instrucciones que verá el cliente al seleccionar esta opción</p>
+                        <textarea
+                          value={shippingInstructions.pickup}
+                          onChange={(e) => setShippingInstructions({ ...shippingInstructions, pickup: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors resize-none"
+                          rows={2}
+                          placeholder="Ej: Horario de atención, dirección, etc."
+                        />
+                      </div>
+
+                      {/* GAM */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Dentro del GAM (Correos)
+                        </label>
+                        <p className="text-xs text-gray-500 mb-2">Instrucciones que verá el cliente al seleccionar esta opción</p>
+                        <textarea
+                          value={shippingInstructions.gam}
+                          onChange={(e) => setShippingInstructions({ ...shippingInstructions, gam: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors resize-none"
+                          rows={2}
+                          placeholder="Ej: Tiempo de entrega, requisitos, etc."
+                        />
+                      </div>
+
+                      {/* Outside GAM */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Fuera del GAM (Correos)
+                        </label>
+                        <p className="text-xs text-gray-500 mb-2">Instrucciones que verá el cliente al seleccionar esta opción</p>
+                        <textarea
+                          value={shippingInstructions.outside_gam}
+                          onChange={(e) => setShippingInstructions({ ...shippingInstructions, outside_gam: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors resize-none"
+                          rows={2}
+                          placeholder="Ej: Tiempo de entrega, requisitos, etc."
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleSaveShippingInstructions}
+                        className="w-full bg-[#f6a07a] text-white py-3 rounded-xl font-semibold hover:bg-[#e58e6a] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Save className="w-5 h-5" />
+                        Guardar Instrucciones
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

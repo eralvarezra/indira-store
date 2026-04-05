@@ -321,6 +321,15 @@ export const SHIPPING_METHODS = {
   }
 } as const
 
+// Shipping method with optional instructions (fetched from settings)
+export interface ShippingMethodWithInstructions {
+  key: string
+  name: string
+  description: string
+  price: number
+  instructions: string | null
+}
+
 export type ShippingMethodKey = keyof typeof SHIPPING_METHODS
 
 // Checkout form data

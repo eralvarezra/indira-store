@@ -45,6 +45,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { state, clearCart, totalPrice, totalItems } = useCart()
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(true)
+  const [shippingInstructions, setShippingInstructions] = useState<Record<string, string>>({})
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     customer_name: '',
@@ -95,8 +96,21 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       }
     }
 
+    const fetchShippingInstructions = async () => {
+      try {
+        const response = await fetch('/api/shipping-instructions')
+        if (response.ok) {
+          const data = await response.json()
+          setShippingInstructions(data.instructions || {})
+        }
+      } catch (error) {
+        console.error('Error fetching shipping instructions:', error)
+      }
+    }
+
     if (isOpen) {
       fetchPaymentMethods()
+      fetchShippingInstructions()
     }
   }, [isOpen])
 
@@ -511,9 +525,21 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </div>
               )}
               {preOrderItems.length > 0 && (
-                <div className="flex items-center gap-2 text-sm text-amber-600 mb-1">
-                  <Clock className="w-4 h-4" />
-                  <span>Pre-pedido ({preOrderItems.reduce((sum, i) => sum + i.quantity, 0)}) ~1.5 semanas</span>
+                <div className="mb-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-600 mb-1">
+                    <Clock className="w-4 h-4" />
+                    <span>Pre-pedido ({preOrderItems.reduce((sum, i) => sum + i.quantity, 0)}) ~1.5 semanas</span>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Adelanto (50%):</span>
+                      <span className="text-amber-600 font-medium">{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-400 text-xs">
+                      <span>Restante al recibir:</span>
+                      <span>{formatPrice(Math.ceil(preOrderTotal * 0.5))}</span>
+                    </div>
+                  </div>
                 </div>
               )}
               <div className="flex justify-between font-bold text-gray-900 mt-2">
@@ -652,31 +678,38 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     {(Object.keys(SHIPPING_METHODS) as ShippingMethodKey[]).map((key) => {
                       const method = SHIPPING_METHODS[key]
                       const isSelected = formData.shipping_method === key
+                      const instructions = shippingInstructions[key]
                       return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleInputChange('shipping_method', key)}
-                          className={clsx(
-                            'w-full p-3 rounded-xl border-2 text-left transition-all',
-                            isSelected
-                              ? 'border-indigo-500 bg-indigo-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          )}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-gray-900">{method.name}</p>
-                              <p className="text-sm text-gray-500">{method.description}</p>
+                        <div key={key}>
+                          <button
+                            type="button"
+                            onClick={() => handleInputChange('shipping_method', key)}
+                            className={clsx(
+                              'w-full p-3 rounded-xl border-2 text-left transition-all',
+                              isSelected
+                                ? 'border-indigo-500 bg-indigo-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            )}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-gray-900">{method.name}</p>
+                                <p className="text-sm text-gray-500">{method.description}</p>
+                              </div>
+                              <span className={clsx(
+                                'font-semibold',
+                                method.price === 0 ? 'text-green-600' : 'text-gray-900'
+                              )}>
+                                {method.price === 0 ? 'Gratis' : formatPrice(method.price)}
+                              </span>
                             </div>
-                            <span className={clsx(
-                              'font-semibold',
-                              method.price === 0 ? 'text-green-600' : 'text-gray-900'
-                            )}>
-                              {method.price === 0 ? 'Gratis' : formatPrice(method.price)}
-                            </span>
-                          </div>
-                        </button>
+                          </button>
+                          {isSelected && instructions && (
+                            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <p className="text-sm text-blue-700 whitespace-pre-wrap">{instructions}</p>
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -808,22 +841,29 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       {paymentMethods.map((method) => {
                         const isSelected = formData.payment_method === method.id
                         return (
-                          <button
-                            key={method.id}
-                            type="button"
-                            onClick={() => handleInputChange('payment_method', method.id)}
-                            className={clsx(
-                              'w-full p-3 rounded-xl border-2 text-left transition-all',
-                              isSelected
-                                ? 'border-indigo-500 bg-indigo-50'
-                                : 'border-gray-200 hover:border-gray-300'
+                          <div key={method.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleInputChange('payment_method', method.id)}
+                              className={clsx(
+                                'w-full p-3 rounded-xl border-2 text-left transition-all',
+                                isSelected
+                                  ? 'border-indigo-500 bg-indigo-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              )}
+                            >
+                              <p className="font-medium text-gray-900">{method.name}</p>
+                              {method.description && (
+                                <p className="text-sm text-gray-500">{method.description}</p>
+                              )}
+                            </button>
+                            {isSelected && method.instructions && (
+                              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p className="text-sm font-medium text-amber-800 mb-1">Instrucciones de pago:</p>
+                                <p className="text-sm text-amber-700 whitespace-pre-wrap">{method.instructions}</p>
+                              </div>
                             )}
-                          >
-                            <p className="font-medium text-gray-900">{method.name}</p>
-                            {method.description && (
-                              <p className="text-sm text-gray-500">{method.description}</p>
-                            )}
-                          </button>
+                          </div>
                         )
                       })}
 
