@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle } from 'lucide-react'
+import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle, Upload, Image as ImageIcon } from 'lucide-react'
 import clsx from 'clsx'
 import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
 
@@ -70,6 +70,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [isSuccess, setIsSuccess] = useState(false)
   const [orderConfirmation, setOrderConfirmation] = useState<OrderConfirmation | null>(null)
   const [copiedOrderNumber, setCopiedOrderNumber] = useState(false)
+  const [paymentProof, setPaymentProof] = useState<File | null>(null)
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null)
+  const [isUploadingProof, setIsUploadingProof] = useState(false)
 
   const selectedCountry = countries.find(c => c.code === formData.country_code) || countries[0]
   const selectedShipping = SHIPPING_METHODS[formData.shipping_method]
@@ -238,6 +241,25 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setIsSubmitting(true)
 
     try {
+      // Upload payment proof if exists
+      let paymentProofUrl: string | null = null
+      if (paymentProof) {
+        setIsUploadingProof(true)
+        const formDataUpload = new FormData()
+        formDataUpload.append('file', paymentProof)
+
+        const uploadResponse = await fetch('/api/upload/payment-proof', {
+          method: 'POST',
+          body: formDataUpload,
+        })
+
+        if (uploadResponse.ok) {
+          const uploadData = await uploadResponse.json()
+          paymentProofUrl = uploadData.url
+        }
+        setIsUploadingProof(false)
+      }
+
       const cleanPhone = formData.phone.replace(/\D/g, '')
       const fullPhone = selectedCountry.prefix ? `${selectedCountry.prefix} ${cleanPhone}` : cleanPhone
 
@@ -270,6 +292,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         shipping_method: formData.shipping_method,
         shipping_cost: shippingCost,
         payment_method: formData.payment_method,
+        payment_proof_url: paymentProofUrl,
         billing_same_as_shipping: formData.billing_same_as_shipping,
         billing_name: formData.billing_same_as_shipping ? null : formData.billing_name.trim(),
         billing_province: formData.billing_same_as_shipping ? null : formData.billing_province,
@@ -788,6 +811,62 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   {errors.payment_method && (
                     <p className="mt-1 text-sm text-red-500">{errors.payment_method}</p>
                   )}
+
+                  {/* Payment Proof Upload */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Comprobante de pago (opcional)
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Sube una captura de pantalla del comprobante de tu pago
+                    </p>
+
+                    {paymentProofPreview ? (
+                      <div className="relative">
+                        <img
+                          src={paymentProofPreview}
+                          alt="Comprobante"
+                          className="w-full h-40 object-cover rounded-xl border-2 border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentProof(null)
+                            setPaymentProofPreview(null)
+                          }}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                        <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-500">Toca para subir imagen</span>
+                        <span className="text-xs text-gray-400">PNG, JPG, WebP (máx. 5MB)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('El archivo es muy grande. El tamaño máximo es 5MB.')
+                                return
+                              }
+                              setPaymentProof(file)
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                setPaymentProofPreview(reader.result as string)
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </section>
 
                 {/* Billing Address Section */}

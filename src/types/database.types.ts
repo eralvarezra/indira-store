@@ -120,6 +120,7 @@ export interface Database {
           // Payment fields
           payment_method: string | null
           payment_details: Json | null
+          payment_proof_url: string | null
           // Billing fields
           billing_same_as_shipping: boolean
           billing_name: string | null
@@ -150,6 +151,7 @@ export interface Database {
           shipping_cost?: number
           payment_method?: string | null
           payment_details?: Json | null
+          payment_proof_url?: string | null
           billing_same_as_shipping?: boolean
           billing_name?: string | null
           billing_province?: string | null
@@ -179,6 +181,7 @@ export interface Database {
           shipping_cost?: number
           payment_method?: string | null
           payment_details?: Json | null
+          payment_proof_url?: string | null
           billing_same_as_shipping?: boolean
           billing_name?: string | null
           billing_province?: string | null

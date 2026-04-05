@@ -18,6 +18,7 @@ interface OrderRequest {
   shipping_cost: number
   // Payment fields
   payment_method?: string | null
+  payment_proof_url?: string | null
   // Billing fields
   billing_same_as_shipping: boolean
   billing_name?: string | null
@@ -343,6 +344,7 @@ interface TelegramNotification extends OrderRequest {
   totalWithShipping: number
   isPreOrder: boolean
   advancePayment?: number
+  paymentProofUrl?: string | null
 }
 
 async function sendTelegramNotification(order: TelegramNotification) {
@@ -446,6 +448,7 @@ ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
   `.trim()
 
   try {
+    // Send message
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
@@ -464,6 +467,33 @@ ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
     if (!response.ok) {
       const errorData = await response.json()
       console.error('Telegram API error:', errorData)
+    }
+
+    // Send payment proof image if exists
+    if (order.payment_proof_url) {
+      const fullImageUrl = order.payment_proof_url.startsWith('http')
+        ? order.payment_proof_url
+        : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://tu-sitio.com'}${order.payment_proof_url}`
+
+      try {
+        await fetch(
+          `https://api.telegram.org/bot${botToken}/sendPhoto`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: chatId,
+              photo: fullImageUrl,
+              caption: `📸 *Comprobante de pago*\nOrden: \`${order.orderNumber}\``,
+              parse_mode: 'Markdown',
+            }),
+          }
+        )
+      } catch (photoError) {
+        console.error('Telegram photo error:', photoError)
+      }
     }
   } catch (error) {
     console.error('Telegram notification error:', error)

@@ -55,6 +55,7 @@ export interface DemoOrder {
   total_with_shipping?: number
   amount_paid?: number
   advance_payment?: number
+  payment_proof_url?: string | null
   status: string
   week_cycle_id: string | null
   created_at: string
