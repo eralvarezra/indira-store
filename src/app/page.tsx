@@ -55,9 +55,9 @@ function CatalogContent() {
     })
   }
 
-  // Get all category IDs that have products
+  // Get all category IDs that have products (use both category and category_id fields)
   const categoryIdsWithProducts = new Set(
-    products.map(p => p.category).filter((c): c is string => !!c)
+    products.map(p => p.category || p.category_id).filter((c): c is string => !!c)
   )
 
   // Get products with discount (promotions)
@@ -65,9 +65,11 @@ function CatalogContent() {
 
   // Filter categories that have products (directly or through subcategories)
   const categoriesWithProducts = categories.filter(category => {
+    // Check if any product has this category
     if (categoryIdsWithProducts.has(category.id)) {
       return true
     }
+    // Check if any subcategory has products
     if (category.subcategories) {
       return category.subcategories.some(sub => categoryIdsWithProducts.has(sub.id))
     }
@@ -104,14 +106,17 @@ function CatalogContent() {
         matchesCategory = (product.discount_percentage || 0) > 0
       } else {
         const mainCategory = categoriesWithProducts.find(c => c.id === selectedMainCategory)
-        const subcategoryIds = mainCategory?.subcategories?.map(s => s.id) || []
+        // Get the product's category (could be in category or category_id field)
+        const productCategoryId = product.category || product.category_id
+        // Get all valid category IDs for this main category (including itself and all subcategories)
+        const allCategoryIds = [selectedMainCategory, ...(mainCategory?.subcategories?.map(s => s.id) || [])]
 
         if (selectedSubcategory !== 'all') {
-          matchesCategory = product.category_id === selectedSubcategory || product.category === selectedSubcategory
+          // Filter by specific subcategory
+          matchesCategory = productCategoryId === selectedSubcategory
         } else {
-          matchesCategory = product.category_id === selectedMainCategory ||
-                            subcategoryIds.includes(product.category_id || '') ||
-                            product.category === selectedMainCategory
+          // "Todos" selected - show products from main category and all subcategories
+          matchesCategory = allCategoryIds.includes(productCategoryId || '')
         }
       }
     }
