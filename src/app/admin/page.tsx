@@ -1181,7 +1181,51 @@ export default function AdminDashboard() {
                           className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           onClick={() => toggleOrderExpand(order.id)}
                         >
-                          <div className="flex items-center justify-between">
+                          {/* Mobile Layout */}
+                          <div className="sm:hidden">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-mono font-medium text-gray-700">#{orderNumber}</span>
+                                {hasPreOrder && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    Pre-pedido
+                                  </span>
+                                )}
+                              </div>
+                              <span className={clsx(
+                                'px-2 py-1 rounded-full text-xs font-medium',
+                                order.status === 'pending' && 'bg-yellow-100 text-yellow-700',
+                                order.status === 'confirmed' && 'bg-green-100 text-green-700',
+                                order.status === 'cancelled' && 'bg-red-100 text-red-700'
+                              )}>
+                                {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Entregado' : 'Cancelado'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-medium text-gray-900">{order.customer_name}</span>
+                                <a
+                                  href={`https://wa.me/${order.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline ml-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {order.phone}
+                                </a>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#E8775A]">{formatPrice(totalWithShipping)}</span>
+                                <ChevronDown className={clsx(
+                                  'w-5 h-5 text-gray-400 transition-transform',
+                                  isExpanded && 'transform rotate-180'
+                                )} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden sm:flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-mono font-medium text-gray-700">#{orderNumber}</span>
