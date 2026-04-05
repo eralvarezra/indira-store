@@ -16,6 +16,10 @@ interface SettingRow {
   value: string
 }
 
+interface SettingIdRow {
+  id: string
+}
+
 function verifyAuth(request: NextRequest): boolean {
   const token = request.cookies.get('admin_token')?.value
   if (!token) return false
@@ -91,12 +95,13 @@ export async function POST(request: NextRequest) {
         .eq('key', settingKey)
         .single()
 
-      if (existing?.id) {
+      const existingSetting = existing as SettingIdRow | null
+      if (existingSetting?.id) {
         // Update existing
         await supabase
           .from('settings')
           .update({ value })
-          .eq('id', existing.id)
+          .eq('id', existingSetting.id)
       } else {
         // Insert new
         await supabase
