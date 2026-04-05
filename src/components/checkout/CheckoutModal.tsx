@@ -428,7 +428,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
               </p>
               <div className="bg-white rounded-lg p-3 mb-3">
                 <p className="text-sm text-gray-600 mb-2">
-                  <strong>Para completar tu pedido, contáctanos:</strong>
+                  <strong>Para darle seguimiento a tu pedido, contáctanos:</strong>
                 </p>
                 <a
                   href="https://wa.me/50686739930"
