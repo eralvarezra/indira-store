@@ -15,6 +15,7 @@ interface OrderWithExtras extends Order {
   amount_paid: number
   advance_payment: number | null
   shipping_cost: number
+  payment_proof_url?: string | null
 }
 
 interface WeekCycle {
@@ -1276,6 +1277,25 @@ export default function AdminDashboard() {
                                 )}
                               </div>
                             )}
+
+                          {/* Payment Proof */}
+                          {(order as OrderWithExtras).payment_proof_url && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-sm text-gray-600 mb-2">Comprobante de pago:</p>
+                              <a
+                                href={(order as OrderWithExtras).payment_proof_url!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                <img
+                                  src={(order as OrderWithExtras).payment_proof_url!}
+                                  alt="Comprobante de pago"
+                                  className="max-w-full h-32 object-contain rounded-lg border border-gray-200 hover:border-[#E8775A] transition-colors cursor-pointer"
+                                />
+                              </a>
+                            </div>
+                          )}
                           </div>
 
                           {/* Action Buttons */}

@@ -167,10 +167,19 @@ export async function POST(request: NextRequest) {
       const order = createOrder({
         customer_name: body.customer_name,
         phone: body.phone,
+        email: body.email,
         items: processedItems,
         total: totalWithShipping,
         status: 'pending',
         order_number: orderNumber,
+        payment_method: body.payment_method,
+        payment_proof_url: body.payment_proof_url || null,
+        shipping_method: body.shipping_method,
+        shipping_cost: body.shipping_cost,
+        province: body.province,
+        canton: body.canton,
+        district: body.district,
+        exact_address: body.exact_address,
       })
       await sendTelegramNotification({ ...body, items: processedItems, orderNumber, totalWithShipping, isPreOrder: hasPreOrderItems })
       return NextResponse.json({ success: true, order, orderNumber, isPreOrder: hasPreOrderItems, advancePayment })
@@ -225,6 +234,7 @@ export async function POST(request: NextRequest) {
       shipping_cost: body.shipping_cost,
       // Payment
       payment_method: body.payment_method,
+      payment_proof_url: body.payment_proof_url || null,
       // Billing
       billing_same_as_shipping: body.billing_same_as_shipping,
       billing_name: body.billing_same_as_shipping ? null : body.billing_name,
