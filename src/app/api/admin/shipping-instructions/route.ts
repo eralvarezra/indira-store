@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         // Update existing
         await supabase
           .from('settings')
-          .update({ value })
+          .update({ value } as never)
           .eq('id', existingSetting.id)
       } else {
         // Insert new
