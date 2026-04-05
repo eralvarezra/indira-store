@@ -1824,7 +1824,6 @@ export default function AdminDashboard() {
                                                 setCategoryForm({
                                                   name: sub.name,
                                                   slug: sub.slug,
-                                                  icon: sub.icon || '',
                                                   parent_id: sub.parent_id,
                                                   sort_order: sub.sort_order,
                                                 })
@@ -1903,7 +1902,6 @@ export default function AdminDashboard() {
                                           setCategoryForm({
                                             name: orphan.name,
                                             slug: orphan.slug,
-                                            icon: orphan.icon || '',
                                             parent_id: null,
                                             sort_order: orphan.sort_order,
                                           })
