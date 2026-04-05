@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     // Return the public URL path
     const url = `/uploads/payment-proofs/${filename}`
 
+    console.log('Payment proof uploaded successfully:', url, 'File size:', file.size)
+
     return NextResponse.json({ success: true, url })
   } catch (error) {
     console.error('Upload error:', error)

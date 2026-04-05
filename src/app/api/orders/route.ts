@@ -471,12 +471,15 @@ ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
 
     // Send payment proof image if exists
     if (order.payment_proof_url) {
+      const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://135.181.37.72:3000'
       const fullImageUrl = order.payment_proof_url.startsWith('http')
         ? order.payment_proof_url
-        : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://tu-sitio.com'}${order.payment_proof_url}`
+        : `${siteUrl}${order.payment_proof_url}`
+
+      console.log('Sending payment proof to Telegram:', fullImageUrl)
 
       try {
-        await fetch(
+        const photoResponse = await fetch(
           `https://api.telegram.org/bot${botToken}/sendPhoto`,
           {
             method: 'POST',
@@ -491,6 +494,13 @@ ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
             }),
           }
         )
+
+        if (!photoResponse.ok) {
+          const photoError = await photoResponse.json()
+          console.error('Telegram photo API error:', photoError)
+        } else {
+          console.log('Payment proof sent successfully to Telegram')
+        }
       } catch (photoError) {
         console.error('Telegram photo error:', photoError)
       }

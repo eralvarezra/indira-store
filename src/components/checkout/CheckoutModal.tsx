@@ -248,14 +248,22 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         const formDataUpload = new FormData()
         formDataUpload.append('file', paymentProof)
 
-        const uploadResponse = await fetch('/api/upload/payment-proof', {
-          method: 'POST',
-          body: formDataUpload,
-        })
+        try {
+          const uploadResponse = await fetch('/api/upload/payment-proof', {
+            method: 'POST',
+            body: formDataUpload,
+          })
 
-        if (uploadResponse.ok) {
-          const uploadData = await uploadResponse.json()
-          paymentProofUrl = uploadData.url
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json()
+            paymentProofUrl = uploadData.url
+            console.log('Payment proof uploaded:', paymentProofUrl)
+          } else {
+            const errorData = await uploadResponse.json()
+            console.error('Payment proof upload failed:', errorData)
+          }
+        } catch (uploadError) {
+          console.error('Payment proof upload error:', uploadError)
         }
         setIsUploadingProof(false)
       }
