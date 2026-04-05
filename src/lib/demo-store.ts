@@ -50,6 +50,7 @@ export interface DemoOrder {
   order_number?: string
   customer_name: string
   phone: string
+  email?: string | null
   items: DemoOrderItem[]
   total: number
   total_with_shipping?: number
@@ -58,6 +59,15 @@ export interface DemoOrder {
   payment_proof_url?: string | null
   status: string
   week_cycle_id: string | null
+  // Shipping
+  province?: string | null
+  canton?: string | null
+  district?: string | null
+  exact_address?: string | null
+  shipping_method?: string
+  shipping_cost?: number
+  // Payment
+  payment_method?: string | null
   created_at: string
 }
 
