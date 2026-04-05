@@ -5,7 +5,6 @@ interface CategoryData {
   id: string
   name: string
   slug: string
-  icon: string | null
   parent_id: string | null
   sort_order: number
   is_active: boolean
@@ -62,7 +61,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, slug, icon, parent_id, sort_order } = body
+    const { name, slug, parent_id, sort_order } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -106,7 +105,6 @@ export async function POST(request: NextRequest) {
     const insertData = {
       name,
       slug: finalSlug,
-      icon: icon || null,
       parent_id: parent_id || null,
       sort_order: sort_order || 0,
       is_active: true,
@@ -143,7 +141,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, slug, icon, parent_id, sort_order, is_active } = body
+    const { id, name, slug, parent_id, sort_order, is_active } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
@@ -158,7 +156,6 @@ export async function PUT(request: NextRequest) {
     const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name
     if (slug !== undefined) updateData.slug = slug
-    if (icon !== undefined) updateData.icon = icon
     if (parent_id !== undefined) updateData.parent_id = parent_id
     if (sort_order !== undefined) updateData.sort_order = sort_order
     if (is_active !== undefined) updateData.is_active = is_active
@@ -222,47 +219,44 @@ function getDefaultCategories() {
       id: 'skin-care',
       name: 'Skin Care',
       slug: 'skin-care',
-      icon: '🧴',
       parent_id: null,
       sort_order: 1,
       is_active: true,
       subcategories: [
-        { id: 'limpiadores', name: 'Limpiadores', slug: 'limpiadores', icon: '🧼', parent_id: 'skin-care', sort_order: 1, is_active: true },
-        { id: 'tonicos', name: 'Tónicos', slug: 'tonicos', icon: '💧', parent_id: 'skin-care', sort_order: 2, is_active: true },
-        { id: 'serums', name: 'Sérums', slug: 'serums', icon: '✨', parent_id: 'skin-care', sort_order: 3, is_active: true },
-        { id: 'hidratantes', name: 'Hidratantes', slug: 'hidratantes', icon: '🧴', parent_id: 'skin-care', sort_order: 4, is_active: true },
-        { id: 'protectores', name: 'Protectores Solares', slug: 'protectores-solares', icon: '☀️', parent_id: 'skin-care', sort_order: 5, is_active: true },
+        { id: 'limpiadores', name: 'Limpiadores', slug: 'limpiadores', parent_id: 'skin-care', sort_order: 1, is_active: true },
+        { id: 'tonicos', name: 'Tónicos', slug: 'tonicos', parent_id: 'skin-care', sort_order: 2, is_active: true },
+        { id: 'serums', name: 'Sérums', slug: 'serums', parent_id: 'skin-care', sort_order: 3, is_active: true },
+        { id: 'hidratantes', name: 'Hidratantes', slug: 'hidratantes', parent_id: 'skin-care', sort_order: 4, is_active: true },
+        { id: 'protectores', name: 'Protectores Solares', slug: 'protectores-solares', parent_id: 'skin-care', sort_order: 5, is_active: true },
       ]
     },
     {
       id: 'maquillaje',
       name: 'Maquillaje',
       slug: 'maquillaje',
-      icon: '💄',
       parent_id: null,
       sort_order: 2,
       is_active: true,
       subcategories: [
-        { id: 'labiales', name: 'Labiales', slug: 'labiales', icon: '💋', parent_id: 'maquillaje', sort_order: 1, is_active: true },
-        { id: 'bases', name: 'Base y Correctores', slug: 'base-correctores', icon: '🎨', parent_id: 'maquillaje', sort_order: 2, is_active: true },
-        { id: 'sombras', name: 'Sombras', slug: 'sombras', icon: '👁️', parent_id: 'maquillaje', sort_order: 3, is_active: true },
-        { id: 'mascaras', name: 'Máscaras de Pestañas', slug: 'mascaras-pestanas', icon: '🌟', parent_id: 'maquillaje', sort_order: 4, is_active: true },
-        { id: 'rubores', name: 'Rubores', slug: 'rubores', icon: '🌸', parent_id: 'maquillaje', sort_order: 5, is_active: true },
+        { id: 'labiales', name: 'Labiales', slug: 'labiales', parent_id: 'maquillaje', sort_order: 1, is_active: true },
+        { id: 'bases', name: 'Base y Correctores', slug: 'base-correctores', parent_id: 'maquillaje', sort_order: 2, is_active: true },
+        { id: 'sombras', name: 'Sombras', slug: 'sombras', parent_id: 'maquillaje', sort_order: 3, is_active: true },
+        { id: 'mascaras', name: 'Máscaras de Pestañas', slug: 'mascaras-pestanas', parent_id: 'maquillaje', sort_order: 4, is_active: true },
+        { id: 'rubores', name: 'Rubores', slug: 'rubores', parent_id: 'maquillaje', sort_order: 5, is_active: true },
       ]
     },
     {
       id: 'accesorios',
       name: 'Accesorios Maquillistas',
       slug: 'accesorios-profesionales',
-      icon: '💼',
       parent_id: null,
       sort_order: 3,
       is_active: true,
       subcategories: [
-        { id: 'brochas', name: 'Brochas', slug: 'brochas', icon: '🖌️', parent_id: 'accesorios', sort_order: 1, is_active: true },
-        { id: 'esponjas', name: 'Esponjas y Pinceles', slug: 'esponjas-pinceles', icon: '🧽', parent_id: 'accesorios', sort_order: 2, is_active: true },
-        { id: 'paletas', name: 'Paletas y Mezcladores', slug: 'paletas-mezcladores', icon: '🎨', parent_id: 'accesorios', sort_order: 3, is_active: true },
-        { id: 'estuches', name: 'Estuches y Organizadores', slug: 'estuches-organizadores', icon: '💼', parent_id: 'accesorios', sort_order: 4, is_active: true },
+        { id: 'brochas', name: 'Brochas', slug: 'brochas', parent_id: 'accesorios', sort_order: 1, is_active: true },
+        { id: 'esponjas', name: 'Esponjas y Pinceles', slug: 'esponjas-pinceles', parent_id: 'accesorios', sort_order: 2, is_active: true },
+        { id: 'paletas', name: 'Paletas y Mezcladores', slug: 'paletas-mezcladores', parent_id: 'accesorios', sort_order: 3, is_active: true },
+        { id: 'estuches', name: 'Estuches y Organizadores', slug: 'estuches-organizadores', parent_id: 'accesorios', sort_order: 4, is_active: true },
       ]
     }
   ]

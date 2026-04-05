@@ -100,7 +100,6 @@ export default function AdminDashboard() {
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     slug: '',
-    icon: '',
     parent_id: '' as string | null,
     sort_order: 0,
   })
@@ -1704,7 +1703,7 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => {
                       setEditingCategory(null)
-                      setCategoryForm({ name: '', slug: '', icon: '', parent_id: null, sort_order: 0 })
+                      setCategoryForm({ name: '', slug: '', parent_id: null, sort_order: 0 })
                       setShowCategoryModal(true)
                     }}
                     className="flex items-center gap-2 bg-[#f6a07a] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
@@ -1721,7 +1720,7 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => {
                         setEditingCategory(null)
-                        setCategoryForm({ name: '', slug: '', icon: '', parent_id: null, sort_order: 0 })
+                        setCategoryForm({ name: '', slug: '', parent_id: null, sort_order: 0 })
                         setShowCategoryModal(true)
                       }}
                       className="bg-[#f6a07a] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#e58e6a] transition-colors"
@@ -1755,7 +1754,6 @@ export default function AdminDashboard() {
                                         setCategoryForm({
                                           name: category.name,
                                           slug: category.slug,
-                                          icon: category.icon || '',
                                           parent_id: null,
                                           sort_order: category.sort_order,
                                         })
@@ -2473,11 +2471,11 @@ export default function AdminDashboard() {
                   >
                     <option value="">Sin categoría</option>
                     {categories.map((cat) => (
-                      <optgroup key={cat.id} label={`${cat.icon} ${cat.name}`}>
-                        <option value={cat.id}>{cat.icon} {cat.name} (principal)</option>
+                      <optgroup key={cat.id} label={cat.name}>
+                        <option value={cat.id}>{cat.name} (principal)</option>
                         {cat.subcategories?.map((sub) => (
                           <option key={sub.id} value={sub.id}>
-                            {sub.icon} {sub.name}
+                            {sub.name}
                           </option>
                         ))}
                       </optgroup>
@@ -2762,7 +2760,6 @@ export default function AdminDashboard() {
                     const body = {
                       name: categoryForm.name,
                       slug,
-                      icon: categoryForm.icon || null,
                       parent_id: categoryForm.parent_id || null,
                       sort_order: categoryForm.sort_order || 0,
                       ...(editingCategory ? { id: editingCategory.id } : {})
