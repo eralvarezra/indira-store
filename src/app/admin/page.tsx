@@ -15,7 +15,6 @@ interface OrderWithExtras extends Order {
   amount_paid: number
   advance_payment: number | null
   shipping_cost: number
-  payment_proof_url?: string | null
 }
 
 interface WeekCycle {
