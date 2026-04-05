@@ -27,19 +27,55 @@ interface OrderRequest {
   billing_exact_address?: string | null
 }
 
-export async function GET() {
+// Generate sequential order number
+async function generateOrderNumber(supabase: ReturnType<typeof getSupabase>): Promise<string> {
+  if (!supabase) {
+    // Demo mode: generate random number
+    return `ORD${Date.now().toString().slice(-6)}`
+  }
+
+  // Get the max order number from database
+  const { data, error } = await supabase
+    .from('orders')
+    .select('order_number')
+    .order('order_number', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error || !data) {
+    // First order
+    return 'ORD000001'
+  }
+
+  const lastNumber = (data as { order_number: string }).order_number
+  const numericPart = parseInt(lastNumber.replace('ORD', ''), 10)
+  const nextNumber = numericPart + 1
+
+  return `ORD${nextNumber.toString().padStart(6, '0')}`
+}
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase()
+    const { searchParams } = new URL(request.url)
+    const searchTerm = searchParams.get('search')
 
     if (!supabase) {
       // Return orders from demo store
       return NextResponse.json({ orders: getOrders() })
     }
 
-    const { data: orders, error } = await supabase
+    let query = supabase
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // Filter by order number search
+    if (searchTerm) {
+      query = query.or(`order_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+    }
+
+    const { data: orders, error } = await query
 
     if (error) {
       return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 })
@@ -99,17 +135,30 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabase()
 
+    // Calculate totals
+    const totalWithShipping = body.total + body.shipping_cost
+
+    // Check if this is a pre-order (contains any pre-order items)
+    const hasPreOrderItems = processedItems.some(item => item.type === 'pre_order')
+
+    // Calculate advance payment: 50% for pre-orders, 100% for regular orders
+    const advancePayment = hasPreOrderItems ? Math.ceil(totalWithShipping * 0.5) : totalWithShipping
+
+    // Generate order number
+    const orderNumber = await generateOrderNumber(supabase)
+
     if (!supabase) {
       // Demo mode: Create order with week cycle
       const order = createOrder({
         customer_name: body.customer_name,
         phone: body.phone,
         items: processedItems,
-        total: body.total,
+        total: totalWithShipping,
         status: 'pending',
+        order_number: orderNumber,
       })
-      await sendTelegramNotification({ ...body, items: processedItems })
-      return NextResponse.json({ success: true, order })
+      await sendTelegramNotification({ ...body, items: processedItems, orderNumber, totalWithShipping, isPreOrder: hasPreOrderItems })
+      return NextResponse.json({ success: true, order, orderNumber, isPreOrder: hasPreOrderItems, advancePayment })
     }
 
     // Get or create current week cycle
@@ -141,11 +190,15 @@ export async function POST(request: NextRequest) {
 
     // Build order object with all fields
     const orderData = {
+      order_number: orderNumber,
       customer_name: body.customer_name,
       phone: body.phone,
       email: body.email,
       items: processedItems,
       total: body.total,
+      total_with_shipping: totalWithShipping,
+      amount_paid: 0,
+      advance_payment: advancePayment,
       status: 'pending',
       week_cycle_id: weekCycleId,
       // Shipping
@@ -203,9 +256,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Send Telegram notification
-    await sendTelegramNotification({ ...body, items: processedItems })
+    await sendTelegramNotification({ ...body, items: processedItems, orderNumber, totalWithShipping, isPreOrder: hasPreOrderItems })
 
-    return NextResponse.json({ success: true, order })
+    return NextResponse.json({
+      success: true,
+      order,
+      orderNumber,
+      isPreOrder: hasPreOrderItems,
+      advancePayment,
+      totalWithShipping
+    })
   } catch (error) {
     console.error('Order processing error:', error)
     return NextResponse.json(
@@ -265,7 +325,13 @@ async function getOrCreateCurrentWeekCycle(supabase: ReturnType<typeof getSupaba
   return (newCycle as { id: string }).id
 }
 
-async function sendTelegramNotification(order: OrderRequest) {
+interface TelegramNotification extends OrderRequest {
+  orderNumber: string
+  totalWithShipping: number
+  isPreOrder: boolean
+}
+
+async function sendTelegramNotification(order: TelegramNotification) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
 
@@ -285,10 +351,10 @@ async function sendTelegramNotification(order: OrderRequest) {
 
   let itemsList = ''
   if (inStockItems.length > 0) {
-    itemsList += formatItems(inStockItems, 'En Stock') + '\n'
+    itemsList += formatItems(inStockItems, '✅ En Stock') + '\n'
   }
   if (preOrderItems.length > 0) {
-    itemsList += formatItems(preOrderItems, '📦 Pre-order')
+    itemsList += formatItems(preOrderItems, '📦 Pre-pedido') + '\n'
   }
 
   // Get shipping method info
@@ -297,9 +363,16 @@ async function sendTelegramNotification(order: OrderRequest) {
     ? '📦 Recoger en tienda'
     : `🚚 ${shippingMethod.name} - ${order.province}, ${order.canton}, ${order.district}`
 
+  // Payment status for pre-orders
+  const paymentInfo = order.isPreOrder
+    ? `\n\n⚠️ *PRE-PEDIDO DETECTADO*\n💰 *Adelanto requerido (50%):* ₡${order.advancePayment?.toFixed(2) || (order.totalWithShipping * 0.5).toFixed(2)}\n💵 *Restante:* ₡${((order.totalWithShipping * 0.5)).toFixed(2)}`
+    : ''
+
   // Build notification message
   const message = `
 🚨 *NUEVO PEDIDO RECIBIDO!*
+
+🏷️ *Orden:* \`${order.orderNumber}\`
 
 👤 *Cliente:* ${order.customer_name}
 📱 *Teléfono:* ${order.phone}
@@ -307,16 +380,16 @@ ${order.email ? `📧 *Email:* ${order.email}` : ''}
 
 📦 *Productos:*
 ${itemsList}
-
 📊 *Cantidad:* ${totalItems} artículos
 💰 *Subtotal:* ₡${order.total.toFixed(2)}
 
 🚚 *Envío:* ${shippingInfo}
 💵 *Costo envío:* ${order.shipping_cost === 0 ? 'Gratis' : `₡${order.shipping_cost.toFixed(2)}`}
 
-💰 *TOTAL:* ₡${(order.total + order.shipping_cost).toFixed(2)}
+💰 *TOTAL:* ₡${order.totalWithShipping.toFixed(2)}
 
 💳 *Método de pago:* ${order.payment_method || 'No especificado'}
+${order.isPreOrder ? `\n💸 *Adelanto requerido:* ₡${order.advancePayment?.toFixed(2) || (order.totalWithShipping * 0.5).toFixed(2)} (50%)` : ''}
 
 ${order.shipping_method !== 'pickup' ? `
 📍 *Dirección de entrega:*
@@ -330,9 +403,8 @@ ${order.billing_name}
 ${order.billing_exact_address}
 ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
 ` : ''}
-
-${preOrderItems.length > 0 ? '⚠️ *Nota:* Este pedido contiene items de pre-orden (sin stock)' : ''}
-⚡ *Acción:* Contactar cliente para confirmar.
+${paymentInfo}
+⚡ *Acción:* Contactar cliente para confirmar${order.isPreOrder ? ' y recibir adelanto.' : '.'}
   `.trim()
 
   try {

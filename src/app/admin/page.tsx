@@ -8,6 +8,14 @@ import { Product, Order, Category, ProductVariant, ProductWithVariants, ProductI
 
 type Tab = 'products' | 'orders' | 'promos' | 'categories' | 'reports' | 'settings'
 
+// Extended Order type with new fields
+interface OrderWithExtras extends Order {
+  order_number?: string | null
+  total_with_shipping?: number | null
+  amount_paid?: number
+  advance_payment?: number | null
+}
+
 interface WeekCycle {
   id: string
   start_date: string
@@ -72,6 +80,11 @@ export default function AdminDashboard() {
   const [showEditOrderModal, setShowEditOrderModal] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [orderForm, setOrderForm] = useState({ customer_name: '', phone: '' })
+  const [orderSearch, setOrderSearch] = useState('')
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false)
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [isAddingPayment, setIsAddingPayment] = useState(false)
 
   // Categories state
   const [categories, setCategories] = useState<Category[]>([])
@@ -780,10 +793,83 @@ export default function AdminDashboard() {
     }
   }
 
-  // Filter orders by week cycle
-  const filteredOrders = selectedCycleId === 'all'
+  // Filter orders by week cycle and search
+  const filteredOrders = (selectedCycleId === 'all'
     ? orders
     : orders.filter(order => order.week_cycle_id === selectedCycleId)
+  ).filter(order => {
+    if (!orderSearch) return true
+    const search = orderSearch.toLowerCase()
+    const orderWithExtras = order as OrderWithExtras
+    return (
+      orderWithExtras.order_number?.toLowerCase().includes(search) ||
+      order.customer_name.toLowerCase().includes(search) ||
+      order.phone.toLowerCase().includes(search)
+    )
+  })
+
+  // Handler for adding payment
+  const handleAddPayment = async () => {
+    if (!paymentOrderId || !paymentAmount) return
+
+    const amount = parseFloat(paymentAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Ingresa un monto válido')
+      return
+    }
+
+    setIsAddingPayment(true)
+
+    try {
+      const order = orders.find(o => o.id === paymentOrderId) as OrderWithExtras
+      const currentPaid = order?.amount_paid || 0
+      const newAmountPaid = currentPaid + amount
+
+      const response = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: paymentOrderId,
+          amount_paid: newAmountPaid,
+        }),
+      })
+
+      if (response.ok) {
+        // Update local state
+        setOrders(orders.map(o => {
+          if (o.id === paymentOrderId) {
+            return { ...o, amount_paid: newAmountPaid }
+          }
+          return o
+        }))
+        setShowPaymentModal(false)
+        setPaymentOrderId(null)
+        setPaymentAmount('')
+        fetchData()
+      } else {
+        alert('Error al agregar el pago')
+      }
+    } catch (error) {
+      console.error('Error adding payment:', error)
+      alert('Error al agregar el pago')
+    } finally {
+      setIsAddingPayment(false)
+    }
+  }
+
+  // Handler for marking order as delivered
+  const handleMarkDelivered = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId) as OrderWithExtras
+    const totalWithShipping = order?.total_with_shipping || order?.total || 0
+    const amountPaid = order?.amount_paid || 0
+
+    if (amountPaid < totalWithShipping) {
+      alert('El pedido no está completamente pagado')
+      return
+    }
+
+    await handleUpdateOrderStatus(orderId, 'confirmed')
+  }
 
   // Get all category IDs that have products
   const categoryIdsWithProducts = new Set(
@@ -1001,36 +1087,62 @@ export default function AdminDashboard() {
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4 gap-4">
                   <h2 className="text-lg font-semibold">Historial de Pedidos</h2>
-                  {/* Week Cycle Filter */}
+                  {/* Search by order number */}
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <select
-                      value={selectedCycleId}
-                      onChange={(e) => setSelectedCycleId(e.target.value)}
-                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
-                    >
-                      <option value="all">Todos los pedidos</option>
-                      {weekCycles.map((cycle) => (
-                        <option key={cycle.id} value={cycle.id}>
-                          {new Date(cycle.start_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
-                          {cycle.status === 'open' ? ' (Actual)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      placeholder="Buscar por #orden, nombre o teléfono"
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none w-64"
+                    />
+                    {/* Week Cycle Filter */}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <select
+                        value={selectedCycleId}
+                        onChange={(e) => setSelectedCycleId(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-[#f6a07a] outline-none"
+                      >
+                        <option value="all">Todos los pedidos</option>
+                        {weekCycles.map((cycle) => (
+                          <option key={cycle.id} value={cycle.id}>
+                            {new Date(cycle.start_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })} - {new Date(cycle.end_date).toLocaleDateString('es-CR', { month: 'short', day: 'numeric' })}
+                            {cycle.status === 'open' ? ' (Actual)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-4">
                   {filteredOrders.map((order) => {
                     const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
                     const hasPreOrder = orderItems.some(item => item.type === 'pre_order')
+                    const orderWithExtras = order as OrderWithExtras
+                    const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
+                    const totalWithShipping = orderWithExtras.total_with_shipping || order.total || 0
+                    const amountPaid = orderWithExtras.amount_paid || 0
+                    const advancePayment = orderWithExtras.advance_payment || (hasPreOrder ? Math.ceil(totalWithShipping * 0.5) : totalWithShipping)
+                    const remainingPayment = totalWithShipping - amountPaid
+                    const isFullyPaid = amountPaid >= totalWithShipping
+                    const needsAdvance = hasPreOrder && amountPaid < advancePayment
 
                     return (
                       <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
                         <div className="p-4">
                           <div className="flex items-start justify-between mb-3">
                             <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-mono text-gray-400">#{orderNumber}</span>
+                                {hasPreOrder && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    Pre-pedido
+                                  </span>
+                                )}
+                              </div>
                               <h3 className="font-semibold text-gray-900">{order.customer_name}</h3>
                               <p className="text-sm text-gray-500">{order.phone}</p>
                             </div>
@@ -1042,13 +1154,8 @@ export default function AdminDashboard() {
                                   order.status === 'confirmed' && 'bg-green-100 text-green-700',
                                   order.status === 'cancelled' && 'bg-red-100 text-red-700'
                                 )}>
-                                  {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Confirmado' : 'Cancelado'}
+                                  {order.status === 'pending' ? 'Pendiente' : order.status === 'confirmed' ? 'Entregado' : 'Cancelado'}
                                 </span>
-                                {hasPreOrder && (
-                                  <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                    Pre-pedido
-                                  </span>
-                                )}
                                 <p className="text-xs text-gray-400 mt-1">{formatDate(order.created_at)}</p>
                               </div>
                               <div className="flex gap-1">
@@ -1085,19 +1192,71 @@ export default function AdminDashboard() {
                             ))}
                             <div className="flex items-center justify-between font-bold pt-2 mt-2 border-t border-gray-200">
                               <span>Total</span>
-                              <span className="text-[#E8775A]">{formatPrice(order.total)}</span>
+                              <span className="text-[#E8775A]">{formatPrice(totalWithShipping)}</span>
                             </div>
+
+                            {/* Payment progress for pre-orders */}
+                            {hasPreOrder && order.status === 'pending' && (
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="text-gray-600">Pagado:</span>
+                                  <span className={isFullyPaid ? 'text-green-600 font-medium' : 'text-gray-900'}>
+                                    {formatPrice(amountPaid)} / {formatPrice(totalWithShipping)}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                  <div
+                                    className={clsx(
+                                      'h-2 rounded-full transition-all',
+                                      isFullyPaid ? 'bg-green-500' : amountPaid >= advancePayment ? 'bg-amber-500' : 'bg-red-500'
+                                    )}
+                                    style={{ width: `${Math.min((amountPaid / totalWithShipping) * 100, 100)}%` }}
+                                  />
+                                </div>
+                                {!isFullyPaid && (
+                                  <div className="flex justify-between text-xs text-gray-500">
+                                    <span>Adelanto mínimo: {formatPrice(advancePayment)}</span>
+                                    <span className={clsx(amountPaid >= advancePayment ? 'text-green-600' : 'text-amber-600')}>
+                                      {amountPaid >= advancePayment ? '✓ Adelanto completo' : `Falta: ${formatPrice(advancePayment - amountPaid)}`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Action Buttons */}
                           {order.status === 'pending' && (
                             <div className="flex gap-2 mt-4">
+                              {hasPreOrder && !isFullyPaid && (
+                                <button
+                                  onClick={() => {
+                                    setPaymentOrderId(order.id)
+                                    setShowAddPaymentModal(true)
+                                  }}
+                                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                                >
+                                  <CreditCard className="w-4 h-4" />
+                                  Agregar Pago
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleUpdateOrderStatus(order.id, 'confirmed')}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                                onClick={() => {
+                                  if (hasPreOrder && !isFullyPaid) {
+                                    alert('Este pedido requiere el pago completo antes de ser entregado.')
+                                    return
+                                  }
+                                  handleMarkDelivered(order.id)
+                                }}
+                                className={clsx(
+                                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                  hasPreOrder && !isFullyPaid
+                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    : 'bg-green-600 text-white hover:bg-green-700'
+                                )}
                               >
                                 <Check className="w-4 h-4" />
-                                Confirmar Entrega
+                                Entregado
                               </button>
                               <button
                                 onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
@@ -2573,6 +2732,109 @@ export default function AdminDashboard() {
               >
                 {editingPayment ? 'Guardar Cambios' : 'Crear Método de Pago'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Payment Modal */}
+      {showAddPaymentModal && paymentOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowAddPaymentModal(false); setPaymentOrderId(null); setPaymentAmount(''); }} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Agregar Pago</h3>
+              <button onClick={() => { setShowAddPaymentModal(false); setPaymentOrderId(null); setPaymentAmount(''); }} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              {(() => {
+                const order = orders.find(o => o.id === paymentOrderId) as OrderWithExtras
+                const totalWithShipping = order?.total_with_shipping || order?.total || 0
+                const amountPaid = order?.amount_paid || 0
+                const advancePayment = order?.advance_payment || Math.ceil(totalWithShipping * 0.5)
+                const remaining = totalWithShipping - amountPaid
+
+                return (
+                  <>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Total del pedido:</span>
+                        <span className="font-medium">{formatPrice(totalWithShipping)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Pagado hasta ahora:</span>
+                        <span className="font-medium text-green-600">{formatPrice(amountPaid)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold pt-2 border-t border-gray-200">
+                        <span>Pendiente:</span>
+                        <span className="text-amber-600">{formatPrice(remaining)}</span>
+                      </div>
+                      {order && (order.items as { type?: 'in_stock' | 'pre_order' }[]).some(i => i.type === 'pre_order') && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>Adelanto mínimo requerido:</span>
+                            <span>{formatPrice(advancePayment)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Monto del pago (CRC)
+                      </label>
+                      <input
+                        type="number"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none"
+                        placeholder="0"
+                        min="0"
+                        max={remaining}
+                        step="1"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => setPaymentAmount(String(advancePayment - amountPaid))}
+                          className="flex-1 px-3 py-2 text-xs bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
+                          disabled={amountPaid >= advancePayment}
+                        >
+                          Completar adelanto
+                        </button>
+                        <button
+                          onClick={() => setPaymentAmount(String(remaining))}
+                          className="flex-1 px-3 py-2 text-xs bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+                        >
+                          Pagar todo
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleAddPayment}
+                      disabled={isAddingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                      className={clsx(
+                        'w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2',
+                        isAddingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'bg-[#f6a07a] text-white hover:bg-[#e58e6a]'
+                      )}
+                    >
+                      {isAddingPayment ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-5 h-5" />
+                          Agregar Pago
+                        </>
+                      )}
+                    </button>
+                  </>
+                )
+              })()}
             </div>
           </div>
         </div>

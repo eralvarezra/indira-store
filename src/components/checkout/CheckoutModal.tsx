@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home } from 'lucide-react'
+import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
 
@@ -25,6 +25,13 @@ interface FormErrors {
   billing_canton?: string
   billing_district?: string
   billing_exact_address?: string
+}
+
+interface OrderConfirmation {
+  orderNumber: string
+  isPreOrder: boolean
+  advancePayment: number
+  totalWithShipping: number
 }
 
 const countries = [
@@ -61,6 +68,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const [errors, setErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [orderConfirmation, setOrderConfirmation] = useState<OrderConfirmation | null>(null)
+  const [copiedOrderNumber, setCopiedOrderNumber] = useState(false)
 
   const selectedCountry = countries.find(c => c.code === formData.country_code) || countries[0]
   const selectedShipping = SHIPPING_METHODS[formData.shipping_method]
@@ -257,31 +266,17 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         throw new Error('Error al procesar el pedido')
       }
 
+      const responseData = await response.json()
+
+      // Set order confirmation data
+      setOrderConfirmation({
+        orderNumber: responseData.orderNumber || `ORD${Date.now().toString().slice(-6)}`,
+        isPreOrder: responseData.isPreOrder || preOrderItems.length > 0,
+        advancePayment: responseData.advancePayment || Math.ceil(totalWithShipping * 0.5),
+        totalWithShipping: responseData.totalWithShipping || totalWithShipping,
+      })
       setIsSuccess(true)
       clearCart()
-
-      setTimeout(() => {
-        setIsSuccess(false)
-        setFormData({
-          customer_name: '',
-          phone: '',
-          country_code: 'CR',
-          email: '',
-          province: '',
-          canton: '',
-          district: '',
-          exact_address: '',
-          shipping_method: 'pickup',
-          payment_method: '',
-          billing_same_as_shipping: true,
-          billing_name: '',
-          billing_province: '',
-          billing_canton: '',
-          billing_district: '',
-          billing_exact_address: '',
-        })
-        onClose()
-      }, 3000)
     } catch (error) {
       console.error('Order submission error:', error)
       setErrors({ phone: 'Error al procesar el pedido. Intenta de nuevo.' })
@@ -314,17 +309,105 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
 
-        {isSuccess ? (
+        {isSuccess && orderConfirmation ? (
           <div className="p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              ¡Pedido Enviado!
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              ¡Pedido Confirmado!
             </h3>
-            <p className="text-gray-600">
-              Te contactaremos pronto para confirmar tu pedido.
-            </p>
+
+            {/* Order Number - Copyable */}
+            <div className="mt-6 mb-6">
+              <p className="text-sm text-gray-500 mb-2">Tu número de orden:</p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(orderConfirmation.orderNumber)
+                  setCopiedOrderNumber(true)
+                  setTimeout(() => setCopiedOrderNumber(false), 2000)
+                }}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors group"
+              >
+                <span className="text-2xl font-mono font-bold text-indigo-600">
+                  {orderConfirmation.orderNumber}
+                </span>
+                {copiedOrderNumber ? (
+                  <Check className="w-5 h-5 text-green-500" />
+                ) : (
+                  <Copy className="w-5 h-5 text-indigo-400 group-hover:text-indigo-600" />
+                )}
+              </button>
+              <p className="text-xs text-gray-400 mt-1">Toca para copiar</p>
+            </div>
+
+            {/* Pre-order Info */}
+            {orderConfirmation.isPreOrder && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-amber-800 mb-1">Este es un pre-pedido</p>
+                    <p className="text-sm text-amber-700 mb-2">
+                      Tu pedido contiene productos que no están en stock actualmente.
+                    </p>
+                    <div className="bg-white rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Adelanto requerido (50%):</span>
+                        <span className="font-bold text-amber-600">{formatPrice(orderConfirmation.advancePayment)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Restante al entregar:</span>
+                        <span className="font-medium text-gray-900">{formatPrice(orderConfirmation.totalWithShipping - orderConfirmation.advancePayment)}</span>
+                      </div>
+                      <div className="border-t border-gray-100 pt-2 flex justify-between">
+                        <span className="text-gray-900 font-medium">Total:</span>
+                        <span className="font-bold text-gray-900">{formatPrice(orderConfirmation.totalWithShipping)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Instructions */}
+            <div className="bg-gray-50 rounded-xl p-4 text-left mb-6">
+              <p className="text-sm text-gray-600 mb-2">
+                <strong>Importante:</strong> Guarda tu número de orden para dar seguimiento a tu pedido.
+              </p>
+              <p className="text-sm text-gray-600">
+                Te contactaremos pronto para coordinar el {orderConfirmation.isPreOrder ? 'adelanto y ' : ''}la entrega.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsSuccess(false)
+                setOrderConfirmation(null)
+                setFormData({
+                  customer_name: '',
+                  phone: '',
+                  country_code: 'CR',
+                  email: '',
+                  province: '',
+                  canton: '',
+                  district: '',
+                  exact_address: '',
+                  shipping_method: 'pickup',
+                  payment_method: '',
+                  billing_same_as_shipping: true,
+                  billing_name: '',
+                  billing_province: '',
+                  billing_canton: '',
+                  billing_district: '',
+                  billing_exact_address: '',
+                })
+                onClose()
+              }}
+              className="w-full py-3 px-6 bg-[#f6a07a] hover:bg-[#e58e6a] text-white font-semibold rounded-xl transition-colors"
+            >
+              Entendido
+            </button>
           </div>
         ) : (
           <>

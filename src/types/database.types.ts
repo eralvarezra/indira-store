@@ -99,11 +99,15 @@ export interface Database {
       orders: {
         Row: {
           id: string
+          order_number: string | null
           customer_name: string
           phone: string
           email: string | null
           items: Json
           total: number
+          total_with_shipping: number | null
+          amount_paid: number
+          advance_payment: number | null
           status: string
           week_cycle_id: string | null
           // Shipping fields
@@ -127,11 +131,15 @@ export interface Database {
         }
         Insert: {
           id?: string
+          order_number?: string | null
           customer_name: string
           phone: string
           email?: string | null
           items: Json
           total: number
+          total_with_shipping?: number | null
+          amount_paid?: number
+          advance_payment?: number | null
           status?: string
           week_cycle_id?: string | null
           province?: string | null
@@ -152,11 +160,15 @@ export interface Database {
         }
         Update: {
           id?: string
+          order_number?: string | null
           customer_name?: string
           phone?: string
           email?: string | null
           items?: Json
           total?: number
+          total_with_shipping?: number | null
+          amount_paid?: number
+          advance_payment?: number | null
           status?: string
           week_cycle_id?: string | null
           province?: string | null

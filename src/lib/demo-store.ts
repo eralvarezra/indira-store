@@ -47,10 +47,14 @@ export interface DemoProductImage {
 
 export interface DemoOrder {
   id: string
+  order_number?: string
   customer_name: string
   phone: string
   items: DemoOrderItem[]
   total: number
+  total_with_shipping?: number
+  amount_paid?: number
+  advance_payment?: number
   status: string
   week_cycle_id: string | null
   created_at: string

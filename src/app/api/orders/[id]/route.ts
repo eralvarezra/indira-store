@@ -60,9 +60,15 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { status } = body
+    const { status, amount_paid } = body
 
-    if (!status || !['pending', 'confirmed', 'cancelled'].includes(status)) {
+    // Validate that at least one field is provided
+    if (status === undefined && amount_paid === undefined) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    // Validate status if provided
+    if (status !== undefined && !['pending', 'confirmed', 'cancelled'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
@@ -76,8 +82,12 @@ export async function PATCH(
         return NextResponse.json({ error: 'Order not found' }, { status: 404 })
       }
 
-      const order = updateOrder(id, { status })
-      if (order) {
+      const updateData: Record<string, unknown> = {}
+      if (status) updateData.status = status
+      if (amount_paid !== undefined) updateData.amount_paid = amount_paid
+
+      const order = updateOrder(id, updateData)
+      if (order && status) {
         await handleStockChange(order.items as OrderItem[], status)
       }
 
@@ -97,10 +107,15 @@ export async function PATCH(
 
     const currentOrder = currentOrderData as OrderData
 
-    // Update order status
+    // Build update object
+    const updateData: Record<string, unknown> = {}
+    if (status) updateData.status = status
+    if (amount_paid !== undefined) updateData.amount_paid = amount_paid
+
+    // Update order
     const { data: order, error } = await supabase
       .from('orders')
-      .update({ status } as never)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single()
@@ -110,7 +125,9 @@ export async function PATCH(
     }
 
     // Handle stock based on status change
-    await handleStockChangeSupabase(supabase, currentOrder.items, status)
+    if (status) {
+      await handleStockChangeSupabase(supabase, currentOrder.items, status)
+    }
 
     return NextResponse.json({ success: true, order })
   } catch (error) {
