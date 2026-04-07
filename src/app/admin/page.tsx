@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen, CreditCard } from 'lucide-react'
+import { Package, ShoppingBag, Settings, LogOut, Plus, Edit2, Trash2, X, Save, Loader2, Upload, Image as ImageIcon, Check, XCircle, Percent, Tag, ChevronDown, BarChart3, Calendar, Clock, Download, FolderOpen, CreditCard, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { Product, Order, Category, ProductVariant, ProductWithVariants, ProductImage, PaymentMethod } from '@/types/database.types'
 
@@ -103,6 +103,11 @@ export default function AdminDashboard() {
     parent_id: '' as string | null,
     sort_order: 0,
   })
+
+  // Product filters
+  const [productSearch, setProductSearch] = useState('')
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>('all')
+  const [productSubcategoryFilter, setProductSubcategoryFilter] = useState<string>('all')
 
   // Payment methods state
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
@@ -1053,8 +1058,128 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
+                {/* Product Filters */}
+                <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Search by name */}
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Buscar producto</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Nombre del producto..."
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[#f6a07a] focus:outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Category filter */}
+                    <div className="sm:w-48">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Categoría</label>
+                      <select
+                        value={productCategoryFilter}
+                        onChange={(e) => {
+                          setProductCategoryFilter(e.target.value)
+                          setProductSubcategoryFilter('all')
+                        }}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#f6a07a] focus:outline-none text-sm"
+                      >
+                        <option value="all">Todas</option>
+                        {categories.filter(c => !c.parent_id).map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Subcategory filter */}
+                    <div className="sm:w-48">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Subcategoría</label>
+                      <select
+                        value={productSubcategoryFilter}
+                        onChange={(e) => setProductSubcategoryFilter(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#f6a07a] focus:outline-none text-sm"
+                        disabled={productCategoryFilter === 'all'}
+                      >
+                        <option value="all">Todas</option>
+                        {productCategoryFilter !== 'all' && categories
+                          .filter(c => c.parent_id === productCategoryFilter)
+                          .map(sub => (
+                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                          ))
+                        }
+                      </select>
+                    </div>
+
+                    {/* Clear filters button */}
+                    {(productSearch || productCategoryFilter !== 'all' || productSubcategoryFilter !== 'all') && (
+                      <button
+                        onClick={() => {
+                          setProductSearch('')
+                          setProductCategoryFilter('all')
+                          setProductSubcategoryFilter('all')
+                        }}
+                        className="self-end px-3 py-2 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                      >
+                        <X className="w-4 h-4" />
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {products.map((product) => (
+                  {(() => {
+                    // Filter products based on search and category
+                    const filteredProducts = products.filter(product => {
+                      // Search filter
+                      const matchesSearch = product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                        (product.description?.toLowerCase().includes(productSearch.toLowerCase()) ?? false)
+
+                      // Category filter
+                      let matchesCategory = true
+                      if (productCategoryFilter !== 'all') {
+                        const productCategoryId = product.category || product.category_id
+                        if (productSubcategoryFilter !== 'all') {
+                          // Filter by specific subcategory
+                          matchesCategory = productCategoryId === productSubcategoryFilter
+                        } else {
+                          // Filter by parent category (includes all subcategories)
+                          const subcategoryIds = categories
+                            .filter(c => c.parent_id === productCategoryFilter)
+                            .map(c => c.id)
+                          matchesCategory = productCategoryId === productCategoryFilter ||
+                            subcategoryIds.includes(productCategoryId || '')
+                        }
+                      }
+
+                      return matchesSearch && matchesCategory
+                    })
+
+                    if (filteredProducts.length === 0) {
+                      return (
+                        <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500">
+                          <Package className="w-12 h-12 text-gray-300 mb-3" />
+                          <p>No se encontraron productos</p>
+                          {(productSearch || productCategoryFilter !== 'all') && (
+                            <button
+                              onClick={() => {
+                                setProductSearch('')
+                                setProductCategoryFilter('all')
+                                setProductSubcategoryFilter('all')
+                              }}
+                              className="mt-2 text-[#E8775A] text-sm font-medium"
+                            >
+                              Limpiar filtros
+                            </button>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return filteredProducts.map((product) => (
                     <div key={product.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
                       <div className="aspect-video bg-gray-100 relative">
                         {product.image_url ? (
@@ -1107,15 +1232,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  })()}
                 </div>
-
-                {products.length === 0 && (
-                  <div className="text-center py-12">
-                    <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay productos. Agrega el primero.</p>
-                  </div>
-                )}
               </div>
             )}
 
