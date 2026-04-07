@@ -2483,11 +2483,11 @@ export default function AdminDashboard() {
                   <div className="space-y-2 mb-3">
                     {productImages.map((image, index) => (
                       <div key={index} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-                        <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                        <div className="relative w-24 min-h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
                           <img
                             src={image.image_url}
                             alt={image.alt_text || `Imagen ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            className="max-w-full max-h-24 object-contain"
                           />
                           {index === 0 && (
                             <span className="absolute bottom-0 left-0 right-0 bg-[#E8775A] text-white text-xs py-0.5 text-center">

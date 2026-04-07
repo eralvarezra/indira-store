@@ -106,15 +106,15 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
         {/* Scrollable content - Image + Details */}
         <div className="flex-1 overflow-y-auto scroll-container">
           {/* Image Carousel */}
-          <div className="relative aspect-square sm:aspect-video bg-gray-100">
+          <div className="relative min-h-64 sm:min-h-48 bg-gray-100 flex items-center justify-center">
             {allImages.length > 0 && allImages[selectedImageIndex]?.image_url ? (
               <img
                 src={allImages[selectedImageIndex].image_url}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-80 sm:max-h-64 object-contain"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+              <div className="w-full h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
                 <ShoppingCart className="w-16 h-16 text-gray-300" />
               </div>
             )}
@@ -166,14 +166,14 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   key={index}
                   onClick={() => setSelectedImageIndex(index)}
                   className={clsx(
-                    'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors',
+                    'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors bg-gray-50 flex items-center justify-center',
                     index === selectedImageIndex ? 'border-[#E8775A]' : 'border-transparent hover:border-gray-300'
                   )}
                 >
                   <img
                     src={image.image_url}
                     alt={`${product.name} ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="max-w-full max-h-full object-contain"
                   />
                 </button>
               ))}

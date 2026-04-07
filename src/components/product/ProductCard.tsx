@@ -77,12 +77,12 @@ export function ProductCard({ product }: ProductCardProps) {
         onClick={() => setShowDetail(true)}
       >
         {/* Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-gray-100">
+        <div className="relative aspect-square overflow-hidden bg-gray-50 flex items-center justify-center">
           {product.image_url ? (
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="max-w-full max-h-full object-contain"
               loading="lazy"
             />
           ) : (
