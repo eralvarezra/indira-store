@@ -304,6 +304,7 @@ export default function AdminDashboard() {
               alt_text: image.alt_text || null,
               is_primary: i === 0,
               sort_order: i,
+              variant_id: image.variant_id || null,
             }),
           })
         }
@@ -2467,45 +2468,70 @@ export default function AdminDashboard() {
 
                 {/* Image Gallery */}
                 {productImages.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="space-y-2 mb-3">
                     {productImages.map((image, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <img
-                          src={image.image_url}
-                          alt={image.alt_text || `Imagen ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Set as primary (move to first position)
-                              const updated = [...productImages]
-                              const [img] = updated.splice(index, 1)
-                              updated.unshift({ ...img, is_primary: true })
-                              setProductImages(updated.map((img, i) => ({ ...img, is_primary: i === 0 })))
-                            }}
-                            className="p-1.5 bg-white rounded-full hover:bg-gray-100"
-                            title="Establecer como principal"
-                          >
-                            <ImageIcon className="w-4 h-4 text-gray-700" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProductImages(productImages.filter((_, i) => i !== index))
-                            }}
-                            className="p-1.5 bg-red-500 rounded-full hover:bg-red-600"
-                            title="Eliminar"
-                          >
-                            <X className="w-4 h-4 text-white" />
-                          </button>
+                      <div key={index} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
+                        <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                          <img
+                            src={image.image_url}
+                            alt={image.alt_text || `Imagen ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {index === 0 && (
+                            <span className="absolute bottom-0 left-0 right-0 bg-[#E8775A] text-white text-xs py-0.5 text-center">
+                              Principal
+                            </span>
+                          )}
                         </div>
-                        {index === 0 && (
-                          <span className="absolute bottom-1 left-1 bg-[#E8775A] text-white text-xs px-1.5 py-0.5 rounded">
-                            Principal
-                          </span>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          {/* Variant selector for this image */}
+                          {productVariants.length > 0 && (
+                            <div className="mb-2">
+                              <select
+                                value={image.variant_id || ''}
+                                onChange={(e) => {
+                                  const updated = [...productImages]
+                                  updated[index] = { ...updated[index], variant_id: e.target.value || null }
+                                  setProductImages(updated)
+                                }}
+                                className="w-full px-2 py-1.5 text-sm rounded border border-gray-200 focus:border-[#f6a07a] outline-none"
+                              >
+                                <option value="">Sin variante (general)</option>
+                                {productVariants.map((variant) => (
+                                  <option key={variant.id} value={variant.id}>
+                                    {variant.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Set as primary (move to first position)
+                                const updated = [...productImages]
+                                const [img] = updated.splice(index, 1)
+                                updated.unshift({ ...img, is_primary: true })
+                                setProductImages(updated.map((img, i) => ({ ...img, is_primary: i === 0 })))
+                              }}
+                              className="text-xs px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                              title="Establecer como principal"
+                            >
+                              Principal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductImages(productImages.filter((_, i) => i !== index))
+                              }}
+                              className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                              title="Eliminar"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2560,7 +2586,8 @@ export default function AdminDashboard() {
                             {
                               image_url: url,
                               is_primary: productImages.length === 0,
-                              sort_order: productImages.length
+                              sort_order: productImages.length,
+                              variant_id: null
                             }
                           ])
                           input.value = ''
@@ -2573,7 +2600,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  La primera imagen será la principal. Puedes agregar múltiples imágenes.
+                  La primera imagen será la principal. Puedes asignar imágenes a variantes específicas.
                 </p>
               </div>
 

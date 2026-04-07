@@ -73,12 +73,17 @@ CREATE TABLE IF NOT EXISTS product_images (
     alt_text VARCHAR(255),
     sort_order INTEGER DEFAULT 0,
     is_primary BOOLEAN DEFAULT FALSE,
+    variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
 -- Create indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_product_images_product_id ON product_images(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_images_primary ON product_images(product_id, is_primary);
+CREATE INDEX IF NOT EXISTS idx_product_images_variant_id ON product_images(variant_id);
+
+-- Add variant_id column to existing databases
+ALTER TABLE product_images ADD COLUMN IF NOT EXISTS variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL;
 
 -- Trigger for updated_at
 CREATE TRIGGER product_images_updated_at

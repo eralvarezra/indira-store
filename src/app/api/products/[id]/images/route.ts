@@ -49,6 +49,7 @@ export async function POST(
       alt_text: body.alt_text || null,
       sort_order: body.sort_order || 0,
       is_primary: body.is_primary || false,
+      variant_id: body.variant_id || null,
     }
 
     if (!supabase) {

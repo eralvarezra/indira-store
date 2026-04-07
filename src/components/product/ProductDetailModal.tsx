@@ -36,6 +36,17 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     setSelectedImageIndex(0)
   }, [product, variants])
 
+  // Update selected image when variant changes
+  useEffect(() => {
+    if (selectedVariant && images.length > 0) {
+      // Find image associated with this variant
+      const variantImageIndex = images.findIndex(img => img.variant_id === selectedVariant.id)
+      if (variantImageIndex !== -1) {
+        setSelectedImageIndex(variantImageIndex)
+      }
+    }
+  }, [selectedVariant, images])
+
   // Get quantity for selected variant
   const quantity = selectedVariant
     ? state.items.find((item) => getCartItemId(item) === `${product.id}-${selectedVariant.id}`)?.quantity || 0
