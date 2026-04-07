@@ -24,7 +24,14 @@
       "Bash(rm -rf \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\[filename]\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\payment-proofs\\\\[filename]\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\uploads\\\\payment-proofs\\\\[filename]\")",
-      "Bash(mv \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\payment-proofs\\\\[filename]\\\\route.ts\" \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\uploads\\\\payment-proofs\\\\[filename]\\\\route.ts\")"
+      "Bash(mv \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\api\\\\uploads\\\\payment-proofs\\\\[filename]\\\\route.ts\" \"C:\\\\Users\\\\Erick\\\\Desktop\\\\Indira Store\\\\src\\\\app\\\\uploads\\\\payment-proofs\\\\[filename]\\\\route.ts\")",
+      "Bash(where sshpass:*)",
+      "Bash(where choco:*)",
+      "Bash(choco install:*)",
+      "Bash(C:/ProgramData/chocolatey/bin/choco.exe install:*)",
+      "Bash(where plink:*)",
+      "Read(//c/ProgramData/chocolatey/bin/**)",
+      "Bash(/c/ProgramData/chocolatey/lib/putty.portable/tools/plink.exe:*)"
     ]
   }
 }
