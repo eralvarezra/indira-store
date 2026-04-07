@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
 import { getOrders, createOrder } from '@/lib/demo-store'
 import { OrderItem, SHIPPING_METHODS, ShippingMethodKey } from '@/types/database.types'
+import { holdStock, releaseStock, confirmStock } from '@/app/api/stock/route'
 
 interface OrderRequest {
   customer_name: string
@@ -188,26 +189,69 @@ export async function POST(request: NextRequest) {
     // Get or create current week cycle
     const weekCycleId = await getOrCreateCurrentWeekCycle(supabase)
 
-    // Process each item - check stock and determine type
+    // Process each item - check available stock (stock - stock_hold) and determine type
     for (const item of processedItems) {
-      const { data: product } = await supabase
-        .from('products')
-        .select('stock')
-        .eq('id', item.product_id)
-        .single()
+      if (item.variant_id) {
+        // Check variant stock
+        const { data: variant } = await supabase
+          .from('product_variants')
+          .select('stock, stock_hold')
+          .eq('id', item.variant_id)
+          .single()
 
-      if (product) {
-        const currentStock = (product as { stock: number }).stock
-        // Determine type based on stock
-        if (currentStock === 0) {
-          item.type = 'pre_order'
-        } else if (currentStock < item.quantity) {
-          return NextResponse.json(
-            { error: `No hay suficiente stock de ${item.name}. Disponible: ${currentStock}` },
-            { status: 400 }
-          )
-        } else {
-          item.type = 'in_stock'
+        if (variant) {
+          const variantData = variant as { stock: number; stock_hold?: number }
+          const stock = variantData.stock
+          const stockHold = variantData.stock_hold || 0
+          const availableStock = Math.max(0, stock - stockHold)
+
+          // Determine type based on available stock
+          if (availableStock === 0 && stock === 0) {
+            item.type = 'pre_order'
+          } else if (availableStock < item.quantity) {
+            // Not enough available stock
+            if (stock === 0) {
+              item.type = 'pre_order'
+            } else {
+              return NextResponse.json(
+                { error: `No hay suficiente stock de ${item.name}. Disponible: ${availableStock}` },
+                { status: 400 }
+              )
+            }
+          } else {
+            item.type = 'in_stock'
+          }
+        }
+      } else {
+        // Check product stock
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock, stock_hold')
+          .eq('id', item.product_id)
+          .single()
+
+        if (product) {
+          const productData = product as { stock: number; stock_hold?: number }
+          const stock = productData.stock
+          const stockHold = productData.stock_hold || 0
+          const availableStock = Math.max(0, stock - stockHold)
+
+          // Determine type based on available stock
+          if (availableStock === 0 && stock === 0) {
+            item.type = 'pre_order'
+          } else if (availableStock < item.quantity) {
+            // Not enough available stock
+            if (stock === 0) {
+              item.type = 'pre_order'
+            } else {
+              return NextResponse.json(
+                { error: `No hay suficiente stock de ${item.name}. Disponible: ${availableStock}` },
+                { status: 400 }
+              )
+            }
+          } else {
+            item.type = 'in_stock'
+          }
         }
       }
     }
@@ -259,25 +303,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Reserve stock for in_stock items only
-    for (const item of processedItems) {
-      if (item.type === 'in_stock') {
-        const { data: productData } = await supabase
-          .from('products')
-          .select('stock')
-          .eq('id', item.product_id)
-          .single()
+    // Reserve stock for in_stock items using hold system
+    const stockItems = processedItems
+      .filter(item => item.type === 'in_stock')
+      .map(item => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id || undefined,
+        quantity: item.quantity
+      }))
 
-        if (productData) {
-          const currentStock = (productData as { stock: number }).stock
-          const newStock = Math.max(0, currentStock - item.quantity)
-
-          await supabase
-            .from('products')
-            .update({ stock: newStock } as never)
-            .eq('id', item.product_id)
-        }
-      }
+    if (stockItems.length > 0) {
+      await holdStock(supabase, stockItems, (order as { id: string }).id)
     }
 
     // Send Telegram notification

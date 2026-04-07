@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase/api'
 import { getOrders, updateOrder, updateProductStock, getProduct, deleteOrder } from '@/lib/demo-store'
+import { releaseStock, confirmStock } from '@/app/api/stock/route'
 
 interface OrderItem {
   product_id: string
@@ -126,7 +127,7 @@ export async function PATCH(
 
     // Handle stock based on status change
     if (status) {
-      await handleStockChangeSupabase(supabase, currentOrder.items, status)
+      await handleStockChangeSupabase(supabase, id, currentOrder.items, status)
     }
 
     return NextResponse.json({ success: true, order })
@@ -158,37 +159,26 @@ async function handleStockChange(
   }
 }
 
-// Handle stock changes with Supabase
+// Handle stock changes with Supabase using hold system
 async function handleStockChangeSupabase(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  orderId: string,
   items: OrderItem[],
   newStatus: string
 ) {
-  for (const item of items) {
-    // Get current product stock
-    const { data: productData } = await supabase
-      .from('products')
-      .select('stock')
-      .eq('id', item.product_id)
-      .single()
+  // Convert items to stock items format
+  const stockItems = items.map(item => ({
+    product_id: item.product_id,
+    variant_id: ((item as { variant_id?: string | null }).variant_id) || undefined,
+    quantity: item.quantity
+  }))
 
-    if (!productData) continue
-
-    const currentStock = (productData as { stock: number }).stock
-    let newStock = currentStock
-
-    if (newStatus === 'confirmed') {
-      // Stock was already reserved, keep the reduction
-      // No need to change anything
-    } else if (newStatus === 'cancelled') {
-      // Return stock (add back)
-      newStock = currentStock + item.quantity
-
-      await supabase
-        .from('products')
-        .update({ stock: newStock } as never)
-        .eq('id', item.product_id)
-    }
+  if (newStatus === 'confirmed') {
+    // Order delivered - reduce stock permanently and release hold
+    await confirmStock(supabase, stockItems, orderId)
+  } else if (newStatus === 'cancelled') {
+    // Order cancelled - release hold and return stock
+    await releaseStock(supabase, stockItems, orderId)
   }
 }
 

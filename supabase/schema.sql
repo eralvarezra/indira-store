@@ -305,6 +305,14 @@ BEGIN
     END IF;
 END $$;
 
+-- Add stock_hold column for inventory reservation
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_hold INTEGER DEFAULT 0;
+ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_hold INTEGER DEFAULT 0;
+
+-- Create index for stock_hold queries
+CREATE INDEX IF NOT EXISTS idx_products_stock_hold ON products(stock_hold);
+CREATE INDEX IF NOT EXISTS idx_product_variants_stock_hold ON product_variants(stock_hold);
+
 -- Add week_cycle_id column to orders if it doesn't exist (for existing databases)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS week_cycle_id UUID REFERENCES week_cycles(id);
 

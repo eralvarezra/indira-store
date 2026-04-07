@@ -281,7 +281,7 @@ export interface Database {
   }
 }
 
-export type Product = Database['public']['Tables']['products']['Row']
+export type Product = Database['public']['Tables']['products']['Row'] & { stock_hold?: number }
 export type CategoryDB = Database['public']['Tables']['categories']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type WeekCycle = Database['public']['Tables']['week_cycles']['Row']
@@ -363,6 +363,7 @@ export interface ProductVariant {
   sku: string | null
   price: number
   stock: number
+  stock_hold?: number
   is_default: boolean
   sort_order: number
   created_at: string
