@@ -446,3 +446,13 @@ export function getEffectiveStock(product: Product, variant?: ProductVariant): n
   }
   return product.stock
 }
+
+// Helper to get available stock (stock - stock_hold)
+export function getAvailableStock(product: Product, variant?: ProductVariant): number {
+  if (variant) {
+    const stockHold = variant.stock_hold || 0
+    return Math.max(0, variant.stock - stockHold)
+  }
+  const stockHold = product.stock_hold || 0
+  return Math.max(0, product.stock - stockHold)
+}

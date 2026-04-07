@@ -1,6 +1,6 @@
 'use client'
 
-import { Product, ProductVariant, ProductImage, ProductWithVariants, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
+import { Product, ProductVariant, ProductImage, ProductWithVariants, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getAvailableStock, getCartItemId } from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
 import { X, Plus, Minus, ShoppingCart, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
@@ -68,7 +68,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   // Calculate effective values based on selected variant
   const effectivePrice = selectedVariant ? getEffectivePrice(product, selectedVariant) : product.price
   const effectiveStock = selectedVariant ? getEffectiveStock(product, selectedVariant) : product.stock
+  const availableStock = selectedVariant ? getAvailableStock(product, selectedVariant) : getAvailableStock(product)
   const isOutOfStock = effectiveStock <= 0
+  const isPreOrder = availableStock <= 0 && effectiveStock > 0 // Has stock but all reserved
 
   const discountPercentage = product.discount_percentage || 0
   const hasDiscount = discountPercentage > 0
@@ -248,17 +250,37 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             {/* Stock info */}
             <div className="flex flex-col gap-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium w-fit ${
-                effectiveStock > 10
+                availableStock > 10
                   ? 'bg-green-100 text-green-700'
-                  : effectiveStock > 0
+                  : availableStock > 0
                     ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-amber-100 text-amber-700'
+                    : isPreOrder
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'bg-amber-100 text-amber-700'
               }`}>
-                {isOutOfStock ? 'Pre-pedido disponible' : `${effectiveStock} disponibles`}
+                {isPreOrder
+                  ? `${effectiveStock} en inventario (${availableStock} disponibles)`
+                  : isOutOfStock
+                    ? 'Pre-pedido disponible'
+                    : `${availableStock} disponibles`}
               </span>
 
               {/* Pre-order message for out of stock */}
-              {isOutOfStock && (
+              {isPreOrder && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">Stock reservado</p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Este producto tiene {effectiveStock} unidades pero están reservadas en pedidos pendientes.
+                      Puedes hacer pre-pedido para recibirlo cuando vuelva a estar disponible.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Pre-order message for out of stock */}
+              {isOutOfStock && !isPreOrder && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
@@ -287,11 +309,14 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
               <button
                 onClick={handleAdd}
+                disabled={!isOutOfStock && quantity >= availableStock}
                 className={clsx(
                   "w-14 h-14 rounded-full flex items-center justify-center transition-colors touch-target",
                   isOutOfStock
                     ? "bg-amber-500 hover:bg-amber-400 active:bg-amber-600"
-                    : "bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]"
+                    : quantity >= availableStock
+                      ? "bg-gray-300 cursor-not-allowed"
+                      : "bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]"
                 )}
               >
                 <Plus className="w-6 h-6 text-white" />

@@ -3,7 +3,7 @@
 import { useCart } from '@/context/CartContext'
 import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package } from 'lucide-react'
 import clsx from 'clsx'
-import { getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
+import { getDiscountedPrice, getEffectivePrice, getEffectiveStock, getAvailableStock, getCartItemId } from '@/types/database.types'
 
 interface CartDrawerProps {
   onCheckout: () => void
@@ -115,6 +115,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                         const itemKey = getCartItemId(item)
                         const effectivePrice = getEffectivePrice(item.product, item.variant)
                         const effectiveStock = getEffectiveStock(item.product, item.variant)
+                        const availableStock = getAvailableStock(item.product, item.variant)
 
                         return (
                           <div
@@ -150,6 +151,11 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                               <p className="text-[#E8775A] font-semibold text-sm mt-0.5">
                                 {formatPrice(getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0))}
                               </p>
+                              {availableStock < effectiveStock && (
+                                <p className="text-orange-600 text-xs mt-0.5">
+                                  Solo {availableStock} disponibles
+                                </p>
+                              )}
 
                               {/* Quantity Controls */}
                               <div className="flex items-center justify-between mt-2">
@@ -165,7 +171,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                                   </span>
                                   <button
                                     onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.variant?.id)}
-                                    disabled={item.quantity >= effectiveStock}
+                                    disabled={item.quantity >= availableStock}
                                     className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                                   >
                                     <Plus className="w-3.5 h-3.5 text-gray-600" />
