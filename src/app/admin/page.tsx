@@ -281,6 +281,46 @@ export default function AdminDashboard() {
       }
 
       if (response.ok && productId) {
+        // Map old variant IDs to new variant IDs (for new products)
+        const variantIdMap: Record<string, string> = {}
+
+        // Handle variants FIRST (so we have the IDs for images)
+        if (productVariants.length > 0) {
+          // Delete existing variants for this product
+          if (editingProduct) {
+            const existingVariants = (editingProduct as ProductWithVariants).variants || []
+            for (const variant of existingVariants) {
+              await fetch(`/api/products/${productId}/variants?variantId=${variant.id}`, {
+                method: 'DELETE'
+              })
+            }
+          }
+
+          // Create new variants and map IDs
+          for (let i = 0; i < productVariants.length; i++) {
+            const variant = productVariants[i]
+            const oldId = variant.id
+            const variantResponse = await fetch(`/api/products/${productId}/variants`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: variant.name,
+                sku: variant.sku || null,
+                price: parseFloat(variant.price?.toString() || '0'),
+                stock: parseInt(variant.stock?.toString() || '0'),
+                is_default: i === 0, // First variant is default
+                sort_order: i,
+              }),
+            })
+            if (variantResponse.ok) {
+              const newVariant = await variantResponse.json()
+              if (oldId && newVariant?.variant?.id) {
+                variantIdMap[oldId] = newVariant.variant.id
+              }
+            }
+          }
+        }
+
         // Handle images - delete existing and create new ones
         if (editingProduct) {
           const existingImages = (editingProduct as ProductWithVariants & { images?: ProductImage[] }).images || []
@@ -293,9 +333,11 @@ export default function AdminDashboard() {
           }
         }
 
-        // Create new images
+        // Create new images with mapped variant IDs
         for (let i = 0; i < productImages.length; i++) {
           const image = productImages[i]
+          // Map old variant ID to new variant ID if it exists
+          const mappedVariantId = image.variant_id ? (variantIdMap[image.variant_id] || image.variant_id) : null
           await fetch(`/api/products/${productId}/images`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -304,39 +346,9 @@ export default function AdminDashboard() {
               alt_text: image.alt_text || null,
               is_primary: i === 0,
               sort_order: i,
-              variant_id: image.variant_id || null,
+              variant_id: mappedVariantId,
             }),
           })
-        }
-
-        // Handle variants
-        if (productVariants.length > 0) {
-          // Delete existing variants for this product
-          if (editingProduct) {
-            const existingVariants = (editingProduct as ProductWithVariants).variants || []
-            for (const variant of existingVariants) {
-              await fetch(`/api/products/${productId}/variants?variantId=${variant.id}`, {
-                method: 'DELETE'
-              })
-            }
-          }
-
-          // Create new variants
-          for (let i = 0; i < productVariants.length; i++) {
-            const variant = productVariants[i]
-            await fetch(`/api/products/${productId}/variants`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                name: variant.name,
-                sku: variant.sku || null,
-                price: parseFloat(variant.price?.toString() || '0'),
-                stock: parseInt(variant.stock?.toString() || '0'),
-                is_default: i === 0, // First variant is default
-                sort_order: i,
-              }),
-            })
-          }
         }
 
         setShowProductModal(false)

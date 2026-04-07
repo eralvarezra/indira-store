@@ -32,7 +32,8 @@
       "Bash(where plink:*)",
       "Read(//c/ProgramData/chocolatey/bin/**)",
       "Bash(/c/ProgramData/chocolatey/lib/putty.portable/tools/plink.exe:*)",
-      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); cats=set\\(\\); [cats.add\\(p.get\\('category'\\) or p.get\\('category_id'\\)\\) for p in data.get\\('products',[]\\) if p.get\\('category'\\) or p.get\\('category_id'\\)]; print\\('Categories with products:', cats\\)\")"
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); cats=set\\(\\); [cats.add\\(p.get\\('category'\\) or p.get\\('category_id'\\)\\) for p in data.get\\('products',[]\\) if p.get\\('category'\\) or p.get\\('category_id'\\)]; print\\('Categories with products:', cats\\)\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }
