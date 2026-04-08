@@ -3207,9 +3207,25 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               {(() => {
                 const order = orders.find(o => o.id === paymentOrderId) as OrderWithExtras
+                const orderItems = Array.isArray(order?.items) ? order.items as { price: number; quantity: number; type?: 'in_stock' | 'pre_order' }[] : []
                 const totalWithShipping = order?.total_with_shipping || order?.total || 0
                 const amountPaid = order?.amount_paid || 0
-                const advancePayment = order?.advance_payment || Math.ceil(totalWithShipping * 0.5)
+                const shippingCost = order?.shipping_cost || 0
+
+                // Calculate advance payment based on order items type
+                let calculatedAdvancePayment = 0
+                for (const item of orderItems) {
+                  const itemTotal = item.price * item.quantity
+                  if (item.type === 'pre_order') {
+                    calculatedAdvancePayment += itemTotal * 0.5 // 50% for pre-orders
+                  } else {
+                    calculatedAdvancePayment += itemTotal // 100% for in-stock items
+                  }
+                }
+                calculatedAdvancePayment += shippingCost // Shipping is always 100%
+                calculatedAdvancePayment = Math.ceil(calculatedAdvancePayment)
+
+                const advancePayment = order?.advance_payment || calculatedAdvancePayment || totalWithShipping
                 const remaining = totalWithShipping - amountPaid
 
                 return (

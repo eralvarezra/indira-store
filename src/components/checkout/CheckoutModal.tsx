@@ -348,7 +348,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       setOrderConfirmation({
         orderNumber: responseData.orderNumber || `ORD${Date.now().toString().slice(-6)}`,
         isPreOrder: responseData.isPreOrder || preOrderItems.length > 0,
-        advancePayment: responseData.advancePayment || Math.ceil(totalWithShipping * 0.5),
+        advancePayment: responseData.advancePayment || advancePaymentAmount,
         totalWithShipping: responseData.totalWithShipping || totalWithShipping,
       })
       setIsSuccess(true)
