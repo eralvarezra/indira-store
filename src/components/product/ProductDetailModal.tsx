@@ -39,6 +39,22 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     }
   }, [product])
 
+  // Update selected image when variant changes
+  useEffect(() => {
+    if (!product || !selectedVariantId) return
+
+    const images = (product as ProductWithVariants & { images?: ProductImage[] }).images || []
+    const variantImageIndex = images.findIndex(img => img.variant_id === selectedVariantId)
+
+    if (variantImageIndex !== -1) {
+      setSelectedImageIndex(variantImageIndex)
+    } else {
+      // If no variant-specific image, find the primary image or use the first one
+      const primaryIndex = images.findIndex(img => img.is_primary)
+      setSelectedImageIndex(primaryIndex !== -1 ? primaryIndex : 0)
+    }
+  }, [selectedVariantId, product])
+
   // Close on escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
