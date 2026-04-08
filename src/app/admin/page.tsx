@@ -165,7 +165,13 @@ export default function AdminDashboard() {
 
       if (settingsRes.ok) {
         const data = await settingsRes.json()
-        setSettings(data.settings || { telegram_bot_token: '', telegram_chat_id: '' })
+        setSettings(prev => ({
+          telegram_bot_token: '',
+          telegram_chat_id: '',
+          site_title: 'Indira Store',
+          site_description: 'Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.',
+          ...data.settings
+        }))
       }
 
       if (cyclesRes.ok) {
