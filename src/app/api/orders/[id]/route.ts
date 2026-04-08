@@ -244,7 +244,30 @@ export async function DELETE(
       return NextResponse.json({ success: true })
     }
 
-    // Delete in Supabase
+    // Get the order first to release stock hold
+    const { data: orderData, error: fetchError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !orderData) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    const order = orderData as OrderData
+
+    // Release stock hold for pending orders before deleting
+    if (order.status === 'pending') {
+      const stockItems = (order.items as OrderItem[]).map(item => ({
+        product_id: item.product_id,
+        variant_id: ((item as { variant_id?: string | null }).variant_id) || undefined,
+        quantity: item.quantity
+      }))
+      await releaseStock(supabase, stockItems, id)
+    }
+
+    // Delete the order
     const { error } = await supabase
       .from('orders')
       .delete()
