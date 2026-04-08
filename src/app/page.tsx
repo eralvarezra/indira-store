@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useMemo } from 'react'
 import { CartProvider } from '@/context/CartContext'
 import { ProductCard } from '@/components/product/ProductCard'
+import { ProductDetailModal } from '@/components/product/ProductDetailModal'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { FloatingCartButton } from '@/components/cart/FloatingCartButton'
 import { CheckoutModal } from '@/components/checkout/CheckoutModal'
@@ -40,7 +41,7 @@ function CatalogContent() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [siteTitle, setSiteTitle] = useState('Indira Store')
-  const [expandedProductId, setExpandedProductId] = useState<string | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithVariants | null>(null)
 
   useEffect(() => {
     const run = async () => {
@@ -362,9 +363,7 @@ function CatalogContent() {
                 >
                   <ProductCard
                     product={product}
-                    isExpanded={expandedProductId === product.id}
-                    onExpand={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
-                    onClose={() => setExpandedProductId(null)}
+                    onOpenDetail={() => setSelectedProduct(product)}
                   />
                 </div>
               ))}
@@ -376,6 +375,11 @@ function CatalogContent() {
       <FloatingCartButton />
       <CartDrawer onCheckout={() => setIsCheckoutOpen(true)} />
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={selectedProduct !== null}
+        onClose={() => setSelectedProduct(null)}
+      />
     </div>
   )
 }
