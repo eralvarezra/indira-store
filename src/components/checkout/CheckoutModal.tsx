@@ -504,7 +504,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 })
                 onClose()
               }}
-              className="w-full py-3 px-6 bg-[#f6a07a] hover:bg-[#e58e6a] text-white font-semibold rounded-xl transition-colors"
+              className="w-full py-3 px-6 bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)] text-white font-semibold rounded-full uppercase tracking-wider text-xs transition-colors"
             >
               Entendido
             </button>
@@ -1156,10 +1156,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   type="submit"
                   disabled={isSubmitting || state.items.length === 0}
                   className={clsx(
-                    'w-full py-4 rounded-xl font-semibold text-white transition-all touch-target text-base',
+                    'w-full py-4 rounded-full font-semibold uppercase tracking-wider text-xs text-white transition-all touch-target',
                     isSubmitting || state.items.length === 0
                       ? 'bg-gray-300 cursor-not-allowed'
-                      : 'bg-[#f6a07a] active:bg-[#e58e6a] active:scale-[0.98]'
+                      : 'bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)] active:scale-[0.98]'
                   )}
                 >
                   {isSubmitting ? (

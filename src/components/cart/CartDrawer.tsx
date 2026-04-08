@@ -94,13 +94,14 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
         )}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10 safe-top">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-lg font-bold text-gray-900">Tu Carrito</h2>
+        <div className="sticky top-0 bg-[color:var(--color-cream)]/95 backdrop-blur-xl border-b border-[color:var(--color-hairline)] px-4 py-3 flex items-center justify-between z-10 safe-top">
+          <div className="flex items-baseline gap-2">
+            <h2 className="font-display text-2xl text-[color:var(--color-ink)]">
+              Tu carrito<span className="italic text-[color:var(--color-brand)]">.</span>
+            </h2>
             {totalItems > 0 && (
-              <span className="bg-indigo-100 text-indigo-600 text-xs font-medium px-2 py-0.5 rounded-full">
-                {totalItems}
+              <span className="text-[10px] uppercase tracking-widest text-[color:var(--color-ink-soft)]">
+                {totalItems} {totalItems === 1 ? 'item' : 'items'}
               </span>
             )}
           </div>
@@ -181,7 +182,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                                   </span>
                                 )}
                               </h3>
-                              <p className="text-[#E8775A] font-semibold text-sm mt-0.5">
+                              <p className="text-[color:var(--color-brand)] font-semibold text-sm mt-0.5">
                                 {formatPrice(getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0))}
                               </p>
                               {availableStock < effectiveStock && (
@@ -287,7 +288,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                                   </span>
                                 )}
                               </h3>
-                              <p className="text-[#E8775A] font-semibold text-sm mt-0.5">
+                              <p className="text-[color:var(--color-brand)] font-semibold text-sm mt-0.5">
                                 {formatPrice(getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0))}
                               </p>
                               <p className="text-amber-600 text-xs mt-1">
@@ -366,7 +367,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                       closeCart()
                       onCheckout()
                     }}
-                    className="flex-1 bg-[#f6a07a] text-white py-3.5 rounded-xl font-semibold active:bg-[#e58e6a] active:scale-[0.98] transition-all touch-target"
+                    className="flex-1 bg-[color:var(--color-brand)] text-white py-3.5 rounded-full font-semibold uppercase tracking-wider text-xs hover:bg-[color:var(--color-brand-dark)] active:scale-[0.98] transition-all touch-target"
                   >
                     {hasPreOrderItems ? `Pagar ${formatPrice(advancePayment)}` : 'Proceder al Pago'}
                   </button>
