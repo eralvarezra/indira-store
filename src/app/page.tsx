@@ -40,6 +40,7 @@ function CatalogContent() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [siteTitle, setSiteTitle] = useState('Indira Store')
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null)
 
   useEffect(() => {
     const run = async () => {
@@ -359,7 +360,12 @@ function CatalogContent() {
                   className="stagger-in"
                   style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
                 >
-                  <ProductCard product={product} />
+                  <ProductCard
+                    product={product}
+                    isExpanded={expandedProductId === product.id}
+                    onExpand={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
+                    onClose={() => setExpandedProductId(null)}
+                  />
                 </div>
               ))}
             </div>
