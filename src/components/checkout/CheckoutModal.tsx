@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
 import { X, Loader2, CheckCircle, ShoppingBag, ChevronDown, Package, Clock, MapPin, CreditCard, Truck, Mail, User, Phone, Building, Home, Copy, Check, AlertTriangle, Upload, Image as ImageIcon, MessageCircle } from 'lucide-react'
 import clsx from 'clsx'
-import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getAvailableStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
+import { OrderItem, getDiscountedPrice, getEffectivePrice, getEffectiveStock, COSTA_RICA_PROVINCES, SHIPPING_METHODS, ShippingMethodKey, PaymentMethod, CheckoutFormData } from '@/types/database.types'
 
 interface CheckoutModalProps {
   isOpen: boolean
@@ -126,9 +126,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   // - in_stock: has available stock OR is truly out of stock (stock = 0, pre-order)
   // - Items with all stock reserved (stock > 0, availableStock <= 0) should be blocked at cart level
   const inStockItems = state.items.filter(item => {
-    const availableStock = getAvailableStock(item.product, item.variant)
     const effectiveStock = getEffectiveStock(item.product, item.variant)
-    return availableStock > 0 || effectiveStock <= 0
+    return effectiveStock > 0
   })
   const preOrderItems = state.items.filter(item => {
     const effectiveStock = getEffectiveStock(item.product, item.variant)
