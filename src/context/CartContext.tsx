@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
-import { Product, ProductVariant, CartItem, getDiscountedPrice, getEffectivePrice, getAvailableStock } from '@/types/database.types'
+import { Product, ProductVariant, CartItem, getDiscountedPrice, getEffectivePrice, getAvailableStock, getEffectiveStock } from '@/types/database.types'
 
 interface CartState {
   items: CartItem[]
@@ -49,8 +49,12 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const availableStock = getAvailableStock(product, variant)
 
       if (existingItem) {
-        // Check if adding one more would exceed available stock
-        if (existingItem.quantity + 1 > availableStock) {
+        // Get effective stock to check if it's a pre-order
+        const effectiveStock = getEffectiveStock(product, variant)
+        const isPreOrder = effectiveStock <= 0
+
+        // Check if adding one more would exceed available stock (only for in-stock items)
+        if (!isPreOrder && existingItem.quantity + 1 > availableStock) {
           return state // Don't add if it exceeds stock
         }
         return {
@@ -63,9 +67,12 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }
       }
 
-      // For new items, check if stock is available
-      if (availableStock < 1) {
-        return state // Don't add if no stock
+      // For new items, check if it's a pre-order or has available stock
+      const effectiveStock = getEffectiveStock(product, variant)
+      const isPreOrder = effectiveStock <= 0
+
+      if (availableStock < 1 && !isPreOrder) {
+        return state // Don't add if no stock and not a pre-order
       }
 
       return {
@@ -106,8 +113,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       if (existingItem) {
         const availableStock = getAvailableStock(existingItem.product, existingItem.variant)
-        // Limit quantity to available stock
-        const limitedQuantity = Math.min(quantity, availableStock)
+        const effectiveStock = getEffectiveStock(existingItem.product, existingItem.variant)
+        const isPreOrder = effectiveStock <= 0
+
+        // For pre-orders, allow any quantity; for in-stock items, limit to available stock
+        const limitedQuantity = isPreOrder ? quantity : Math.min(quantity, availableStock)
 
         return {
           ...state,
@@ -173,8 +183,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [state.items])
 
   const addItem = (product: Product, variant?: ProductVariant): { success: boolean; message?: string } => {
-    // Get available stock
+    // Get available stock and effective stock
     const availableStock = getAvailableStock(product, variant)
+    const effectiveStock = getEffectiveStock(product, variant)
+    const isPreOrder = effectiveStock <= 0
 
     // Find existing item in cart
     const itemKey = getCartItemKey(product.id, variant?.id)
@@ -184,8 +196,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const currentQuantity = existingItem?.quantity || 0
 
-    // Check if adding one more would exceed available stock
-    if (currentQuantity + 1 > availableStock) {
+    // Check if adding one more would exceed available stock (for in-stock items only)
+    // Pre-orders have unlimited quantity since stock = 0
+    if (!isPreOrder && currentQuantity + 1 > availableStock) {
       return {
         success: false,
         message: `Solo hay ${availableStock} unidades disponibles`
@@ -208,8 +221,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     if (existingItem && quantity > 0) {
       const availableStock = getAvailableStock(existingItem.product, existingItem.variant)
+      const effectiveStock = getEffectiveStock(existingItem.product, existingItem.variant)
+      const isPreOrder = effectiveStock <= 0
 
-      if (quantity > availableStock) {
+      // Only check stock limits for in-stock items (not pre-orders)
+      if (!isPreOrder && quantity > availableStock) {
         // Update to max available instead of rejecting
         dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, variantId, quantity: availableStock } })
         return {
