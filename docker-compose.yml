@@ -25,3 +25,9 @@ services:
       - "traefik.http.routers.indirastore.rule=Host(`indirastore.online`) || Host(`www.indirastore.online`)"
       - "traefik.http.routers.indirastore.tls.certresolver=letsencrypt"
       - "traefik.http.services.indirastore.loadbalancer.server.port=3000"
+    networks:
+      - deploy_web
+
+networks:
+  deploy_web:
+    external: true
