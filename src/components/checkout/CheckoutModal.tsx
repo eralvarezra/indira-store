@@ -159,6 +159,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const advancePaymentAmount = Math.ceil(inStockTotal + preOrderTotal * 0.5 + shippingCost)
   const remainingPaymentAmount = Math.ceil(preOrderTotal * 0.5)
 
+  // Calculate correct total (inStockTotal + preOrderTotal + shippingCost)
+  // This ensures consistency even if totalPrice from context has issues
+  const orderTotal = inStockTotal + preOrderTotal + shippingCost
+
   const validatePhone = (phone: string, countryCode: string) => {
     const country = countries.find(c => c.code === countryCode)
     if (!country) return phone.length >= 8
@@ -1128,7 +1132,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                       </div>
                       <div className="flex justify-between text-sm text-gray-500">
                         <span>Total del pedido:</span>
-                        <span>{formatPrice(totalWithShipping)}</span>
+                        <span>{formatPrice(orderTotal)}</span>
                       </div>
                     </>
                   ) : (
