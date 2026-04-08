@@ -39,16 +39,19 @@ function CatalogContent() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(ALL)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [siteTitle, setSiteTitle] = useState('Indira Store')
 
   useEffect(() => {
     const run = async () => {
       try {
-        const [productsRes, categoriesRes] = await Promise.all([
+        const [productsRes, categoriesRes, settingsRes] = await Promise.all([
           fetch('/api/products'),
           fetch('/api/categories'),
+          fetch('/api/settings'),
         ])
         const productsData = await productsRes.json()
         const categoriesData = await categoriesRes.json()
+        const settingsData = await settingsRes.json()
 
         setProducts(productsData.products || [])
 
@@ -61,6 +64,10 @@ function CatalogContent() {
             subcategories: subs.filter(s => s.parent_id === parent.id),
           }))
         )
+
+        if (settingsData.settings?.site_title) {
+          setSiteTitle(settingsData.settings.site_title)
+        }
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -153,14 +160,14 @@ function CatalogContent() {
       <header className="sticky top-0 z-30 safe-top border-b border-[color:var(--color-hairline)] bg-[color:var(--color-cream)]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-4">
-            <a href="/" aria-label="Indira Store — inicio" className="flex items-center gap-3">
+            <a href="/" aria-label={`${siteTitle} — inicio`} className="flex items-center gap-3">
               <img
                 src="/logo.png"
                 alt=""
                 className="h-12 md:h-14 w-auto"
               />
               <span className="hidden sm:block font-display text-2xl md:text-3xl tracking-tight text-[color:var(--color-ink)]">
-                Indira<span className="italic text-[color:var(--color-brand)]">.</span>
+                {siteTitle.replace(' Store', '')}<span className="italic text-[color:var(--color-brand)]">.</span>
               </span>
             </a>
 
