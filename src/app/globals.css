@@ -113,6 +113,25 @@
   }
 
   .touch-target { min-height: 44px; min-width: 44px; }
+
+  /* Fly to cart animation */
+  @keyframes fly-to-cart {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: translate(calc(var(--end-x, 0) * 0.5 - 50%), calc(var(--end-y, 0) * 0.5 - 50%)) scale(0.8);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(var(--end-x, 0) - 50%), calc(var(--end-y, 0) - 50%)) scale(0.3);
+    }
+  }
+  .animate-fly-to-cart {
+    animation: fly-to-cart 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
 }
 
 /* Respect reduced motion */

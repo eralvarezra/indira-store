@@ -9,6 +9,7 @@ export function FloatingCartButton() {
   return (
     <button
       onClick={toggleCart}
+      data-cart-button
       className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 bg-[color:var(--color-brand)] text-white p-4 rounded-full shadow-[0_18px_40px_-10px_rgba(232,119,90,0.55)] hover:bg-[color:var(--color-brand-dark)] active:scale-95 transition-all z-30 touch-target"
       aria-label="Open cart"
     >
