@@ -2264,6 +2264,33 @@ export default function AdminDashboard() {
                         </button>
                       </div>
                     </div>
+                    {/* Countdown Timer */}
+                    {(() => {
+                      const endDate = new Date(weekCycles.find(c => c.status === 'open')!.end_date)
+                      const now = new Date()
+                      const diff = endDate.getTime() - now.getTime()
+                      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+                      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+                      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+                      const isExpired = diff <= 0
+
+                      return (
+                        <div className={`mt-3 p-3 rounded-lg ${isExpired ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
+                          <div className="flex items-center gap-2">
+                            <Clock className={`w-4 h-4 ${isExpired ? 'text-red-600' : 'text-amber-600'}`} />
+                            {isExpired ? (
+                              <span className="text-sm font-medium text-red-700">
+                                ⚠️ La semana ha terminado - Cierra y genera el reporte
+                              </span>
+                            ) : (
+                              <span className="text-sm font-medium text-amber-700">
+                                Tiempo restante: <span className="font-bold">{days}d {hours}h {minutes}m</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <button
                         onClick={handleGenerateReport}
