@@ -41,6 +41,14 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const { product, variant } = action.payload
       const itemKey = getCartItemKey(product.id, variant?.id)
 
+      console.log('[CartContext] Reducer ADD_ITEM:', {
+        productName: product.name,
+        stock: product.stock,
+        stock_hold: product.stock_hold,
+        variantStock: variant?.stock,
+        variantStockHold: variant?.stock_hold
+      })
+
       const existingItem = state.items.find((item) =>
         getCartItemKey(item.product.id, item.variant?.id) === itemKey
       )
@@ -53,10 +61,19 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         const effectiveStock = getEffectiveStock(product, variant)
         const isPreOrder = effectiveStock <= 0
 
+        console.log('[CartContext] Existing item - checking stock:', {
+          effectiveStock,
+          isPreOrder,
+          currentQuantity: existingItem.quantity,
+          availableStock
+        })
+
         // Check if adding one more would exceed available stock (only for in-stock items)
         if (!isPreOrder && existingItem.quantity + 1 > availableStock) {
+          console.log('[CartContext] Blocked - exceeds stock')
           return state // Don't add if it exceeds stock
         }
+        console.log('[CartContext] Incrementing existing item')
         return {
           ...state,
           items: state.items.map((item) =>
@@ -71,10 +88,18 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const effectiveStock = getEffectiveStock(product, variant)
       const isPreOrder = effectiveStock <= 0
 
+      console.log('[CartContext] New item - checking stock:', {
+        effectiveStock,
+        isPreOrder,
+        availableStock
+      })
+
       if (availableStock < 1 && !isPreOrder) {
+        console.log('[CartContext] Blocked - no stock and not a pre-order')
         return state // Don't add if no stock and not a pre-order
       }
 
+      console.log('[CartContext] Adding new item to cart')
       return {
         ...state,
         items: [...state.items, { product, variant, quantity: 1 }],
@@ -188,6 +213,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const effectiveStock = getEffectiveStock(product, variant)
     const isPreOrder = effectiveStock <= 0
 
+    console.log('[CartContext] addItem called:', {
+      productName: product.name,
+      stock: product.stock,
+      stock_hold: product.stock_hold,
+      variantStock: variant?.stock,
+      variantStockHold: variant?.stock_hold,
+      availableStock,
+      effectiveStock,
+      isPreOrder
+    })
+
     // Find existing item in cart
     const itemKey = getCartItemKey(product.id, variant?.id)
     const existingItem = state.items.find(
@@ -199,12 +235,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Check if adding one more would exceed available stock (for in-stock items only)
     // Pre-orders have unlimited quantity since stock = 0
     if (!isPreOrder && currentQuantity + 1 > availableStock) {
+      console.log('[CartContext] Blocked - stock limit reached')
       return {
         success: false,
         message: `Solo hay ${availableStock} unidades disponibles`
       }
     }
 
+    console.log('[CartContext] Adding item to cart')
     dispatch({ type: 'ADD_ITEM', payload: { product, variant } })
     return { success: true }
   }

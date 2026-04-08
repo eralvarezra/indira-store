@@ -50,7 +50,12 @@
       "Bash(ping:*)",
       "Bash(cmd:*)",
       "Bash(printf 'y\\\\n')",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "Bash(ssh:*)",
+      "Bash(git:*)",
+      "Bash(powershell:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(/c/ProgramData/chocolatey/bin/PLINK.EXE:*)"
     ]
   }
 }
