@@ -22,14 +22,19 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
     }).format(price)
   }
 
-  // Separate items into in_stock and pre_order based on variant or product stock
+  // Separate items into in_stock and pre_order based on available stock
+  // - in_stock: has available stock (stock - stock_hold > 0) OR stock = 0 (true pre-order)
+  // - Items with all stock reserved (stock > 0, availableStock <= 0) are excluded from cart
   const inStockItems = state.items.filter(item => {
-    const stock = getEffectiveStock(item.product, item.variant)
-    return stock > 0
+    const availableStock = getAvailableStock(item.product, item.variant)
+    const effectiveStock = getEffectiveStock(item.product, item.variant)
+    // Has available stock OR is truly out of stock (pre-order allowed)
+    return availableStock > 0 || effectiveStock <= 0
   })
   const preOrderItems = state.items.filter(item => {
-    const stock = getEffectiveStock(item.product, item.variant)
-    return stock <= 0
+    const effectiveStock = getEffectiveStock(item.product, item.variant)
+    // Only true pre-orders (stock = 0)
+    return effectiveStock <= 0
   })
 
   const hasPreOrderItems = preOrderItems.length > 0

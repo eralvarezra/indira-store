@@ -87,8 +87,15 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const effectivePrice = selectedVariant ? getEffectivePrice(product, selectedVariant) : product.price
   const effectiveStock = selectedVariant ? getEffectiveStock(product, selectedVariant) : product.stock
   const availableStock = selectedVariant ? getAvailableStock(product, selectedVariant) : getAvailableStock(product)
+
+  // Stock states:
+  // - isOutOfStock: stock = 0 (can do pre-order)
+  // - isAllStockReserved: stock > 0 but all reserved (cannot order, must wait)
+  // - hasStockAvailable: availableStock > 0 (can order normally)
   const isOutOfStock = effectiveStock <= 0
-  const isPreOrder = availableStock <= 0 && effectiveStock > 0 // Has stock but all reserved
+  const isAllStockReserved = effectiveStock > 0 && availableStock <= 0
+  const hasStockAvailable = availableStock > 0
+  const canAddToCart = hasStockAvailable || isOutOfStock // Can add if has stock or is truly out of stock (pre-order)
 
   const discountPercentage = product.discount_percentage || 0
   const hasDiscount = discountPercentage > 0
@@ -268,43 +275,43 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             {/* Stock info */}
             <div className="flex flex-col gap-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium w-fit ${
-                availableStock > 10
-                  ? 'bg-green-100 text-green-700'
-                  : availableStock > 0
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : isPreOrder
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-amber-100 text-amber-700'
+                hasStockAvailable
+                  ? availableStock > 10
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                  : isAllStockReserved
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-amber-100 text-amber-700'
               }`}>
-                {isPreOrder
-                  ? `${effectiveStock} en inventario (${availableStock} disponibles)`
-                  : isOutOfStock
-                    ? 'Pre-pedido disponible'
-                    : `${availableStock} disponibles`}
+                {hasStockAvailable
+                  ? `${availableStock} disponibles`
+                  : isAllStockReserved
+                    ? 'Agotado temporalmente'
+                    : 'Pre-pedido disponible'}
               </span>
 
-              {/* Pre-order message for out of stock */}
-              {isPreOrder && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              {/* All stock reserved message - cannot order */}
+              {isAllStockReserved && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-orange-800">Stock reservado</p>
-                    <p className="text-xs text-orange-700 mt-1">
+                    <p className="text-sm font-medium text-red-800">Stock reservado</p>
+                    <p className="text-xs text-red-700 mt-1">
                       Este producto tiene {effectiveStock} unidades pero están reservadas en pedidos pendientes.
-                      Puedes hacer pre-pedido para recibirlo cuando vuelva a estar disponible.
+                      No está disponible para compra en este momento.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Pre-order message for out of stock */}
-              {isOutOfStock && !isPreOrder && (
+              {isOutOfStock && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-amber-800">Producto disponible para pre-pedido</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      Este producto está actualmente agotado para entrega inmediata.
+                      Este producto está actualmente agotado.
                       Puedes hacer tu pedido y te lo entregaremos en aproximadamente 1.5 semanas.
                     </p>
                   </div>
@@ -351,17 +358,21 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
           ) : (
             <button
               onClick={handleAdd}
-              disabled={hasMultipleVariants && !selectedVariant}
+              disabled={(hasMultipleVariants && !selectedVariant) || isAllStockReserved}
               className={clsx(
                 'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target flex items-center justify-center gap-2',
-                isOutOfStock
-                  ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600'
-                  : 'bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]',
+                isAllStockReserved
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : isOutOfStock
+                    ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600'
+                    : 'bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]',
                 (hasMultipleVariants && !selectedVariant) && 'opacity-50 cursor-not-allowed',
                 isAdding && 'scale-[1.02]'
               )}
             >
-              {isOutOfStock ? (
+              {isAllStockReserved ? (
+                'No disponible'
+              ) : isOutOfStock ? (
                 <>
                   <Clock className="w-5 h-5" />
                   Hacer Pre-pedido
