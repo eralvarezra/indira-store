@@ -18,7 +18,7 @@ services:
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
     restart: unless-stopped
     volumes:
-      - ./public/uploads:/app/public/uploads
+      - uploads_data:/app/public/uploads
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.indirastore.entrypoints=web,websecure"
@@ -31,3 +31,7 @@ services:
 networks:
   deploy_web:
     external: true
+
+volumes:
+  uploads_data:
+    driver: local
