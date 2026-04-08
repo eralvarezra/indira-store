@@ -903,6 +903,79 @@ export default function AdminDashboard() {
     }
   }
 
+  // Handler for verifying payment proof
+  const handleVerifyPayment = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId) as OrderWithExtras
+    if (!order) return
+
+    const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
+    const totalWithShipping = order.total_with_shipping || order.total || 0
+    const currentPaid = order.amount_paid || 0
+
+    // Calculate payment amount based on item types
+    // Pre-orders: 50% advance
+    // In-stock items: 100%
+    let calculatedPayment = 0
+    const hasPreOrderItems = orderItems.some(item => item.type === 'pre_order')
+
+    if (hasPreOrderItems) {
+      // Calculate 50% for pre-orders, 100% for in-stock items
+      for (const item of orderItems) {
+        const itemTotal = item.price * item.quantity
+        if (item.type === 'pre_order') {
+          calculatedPayment += itemTotal * 0.5
+        } else {
+          calculatedPayment += itemTotal
+        }
+      }
+      // Add shipping cost
+      calculatedPayment += order.shipping_cost || 0
+      calculatedPayment = Math.ceil(calculatedPayment)
+    } else {
+      // All in-stock: 100% of total
+      calculatedPayment = totalWithShipping
+    }
+
+    // Check if already paid
+    if (currentPaid >= calculatedPayment) {
+      alert('Este pedido ya tiene el pago registrado')
+      return
+    }
+
+    if (!confirm(`¿Confirmar que el comprobante de pago es válido?\n\nSe registrará un pago de ${formatPrice(calculatedPayment)}${hasPreOrderItems ? ' (50% adelanto por pre-pedidos)' : ' (pago completo)'}`)) {
+      return
+    }
+
+    setIsAddingPayment(true)
+
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount_paid: calculatedPayment,
+        }),
+      })
+
+      if (response.ok) {
+        setOrders(orders.map(o => {
+          if (o.id === orderId) {
+            return { ...o, amount_paid: calculatedPayment }
+          }
+          return o
+        }))
+        fetchData()
+      } else {
+        alert('Error al verificar el pago')
+      }
+    } catch (error) {
+      console.error('Error verifying payment:', error)
+      alert('Error al verificar el pago')
+    } finally {
+      setIsAddingPayment(false)
+    }
+  }
+
   // Handler for marking order as delivered
   const handleMarkDelivered = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId) as OrderWithExtras
@@ -1522,6 +1595,16 @@ export default function AdminDashboard() {
                                       className="max-w-full h-32 object-contain rounded-lg border border-gray-200 hover:border-[#E8775A] transition-colors cursor-pointer"
                                     />
                                   </a>
+                                  {amountPaid === 0 && order.status === 'pending' && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleVerifyPayment(order.id) }}
+                                      disabled={isAddingPayment}
+                                      className="mt-2 w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                      {isAddingPayment ? 'Verificando...' : 'Verificar Comprobante'}
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1607,8 +1690,9 @@ export default function AdminDashboard() {
                     .map(order => {
                       const orderWithExtras = order as OrderWithExtras
                       const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
-                      const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number }[] : []
+                      const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
                       const totalWithShipping = orderWithExtras.total_with_shipping || order.total || 0
+                      const amountPaid = orderWithExtras.amount_paid || 0
 
                       return (
                         <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -1619,6 +1703,20 @@ export default function AdminDashboard() {
                               className="w-full h-full object-cover"
                               onClick={() => window.open(orderWithExtras.payment_proof_url!, '_blank')}
                             />
+                            {order.status === 'pending' && amountPaid === 0 && (
+                              <div className="absolute top-2 right-2">
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                                  Pendiente de verificar
+                                </span>
+                              </div>
+                            )}
+                            {amountPaid > 0 && (
+                              <div className="absolute top-2 right-2">
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                  Verificado
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="p-3">
                             <div className="flex items-center justify-between mb-2">
@@ -1649,6 +1747,11 @@ export default function AdminDashboard() {
                               <p className="text-sm font-semibold text-[#E8775A] mt-1">
                                 Total: {formatPrice(totalWithShipping)}
                               </p>
+                              {amountPaid > 0 && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  Pagado: {formatPrice(amountPaid)}
+                                </p>
+                              )}
                             </div>
                             <p className="text-xs text-gray-400 mt-2">
                               {new Date(order.created_at).toLocaleDateString('es-CR', {
@@ -1659,6 +1762,16 @@ export default function AdminDashboard() {
                                 minute: '2-digit'
                               })}
                             </p>
+                            {order.status === 'pending' && amountPaid === 0 && (
+                              <button
+                                onClick={() => handleVerifyPayment(order.id)}
+                                disabled={isAddingPayment}
+                                className="mt-2 w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              >
+                                <Check className="w-4 h-4" />
+                                {isAddingPayment ? 'Verificando...' : 'Verificar Comprobante'}
+                              </button>
+                            )}
                           </div>
                         </div>
                       )

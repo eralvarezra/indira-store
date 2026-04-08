@@ -56,7 +56,8 @@
       "Bash(powershell:*)",
       "Bash(cmd.exe:*)",
       "Bash(/c/ProgramData/chocolatey/bin/PLINK.EXE:*)",
-      "Bash(nslookup decompritas.com)"
+      "Bash(nslookup decompritas.com)",
+      "Bash(pageant -l)"
     ]
   }
 }
