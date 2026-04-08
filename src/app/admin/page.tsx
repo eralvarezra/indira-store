@@ -36,11 +36,13 @@ interface WeeklyReport {
   startDateFormatted: string
   endDateFormatted: string
   totalOrders: number
-  inStockOrders: number
-  preOrderCount: number
-  inStockCount: number
-  productCounts: Record<string, number>
-  totalRevenue: number
+  preOrdersOnly: number
+  preOrderDetails: {
+    orderNumber: string
+    customerName: string
+    products: string[]
+    orderDate: string
+  }[]
 }
 
 export default function AdminDashboard() {
@@ -2282,59 +2284,51 @@ export default function AdminDashboard() {
                 {weeklyReport && (
                   <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                     <div className="p-4 border-b border-gray-100">
-                      <h3 className="font-semibold text-gray-900">Resumen de la Semana</h3>
+                      <h3 className="font-semibold text-gray-900">Pre-pedidos de la Semana</h3>
                       <p className="text-sm text-gray-500">
                         {weeklyReport.startDateFormatted} - {weeklyReport.endDateFormatted}
                       </p>
                     </div>
 
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="p-4 grid grid-cols-2 gap-4">
                       <div className="bg-indigo-50 rounded-lg p-3 text-center">
                         <div className="text-2xl font-bold text-[#E8775A]">{weeklyReport.totalOrders}</div>
                         <div className="text-xs text-gray-600">Pedidos Totales</div>
                       </div>
-                      <div className="bg-green-50 rounded-lg p-3 text-center">
-                        <div className="text-2xl font-bold text-green-600">{weeklyReport.inStockCount}</div>
-                        <div className="text-xs text-gray-600">En Stock</div>
-                      </div>
                       <div className="bg-amber-50 rounded-lg p-3 text-center">
-                        <div className="text-2xl font-bold text-amber-600">{weeklyReport.preOrderCount}</div>
+                        <div className="text-2xl font-bold text-amber-600">{weeklyReport.preOrdersOnly}</div>
                         <div className="text-xs text-gray-600">Pre-pedidos</div>
-                      </div>
-                      <div className="bg-purple-50 rounded-lg p-3 text-center">
-                        <div className="text-lg font-bold text-purple-600">{formatPrice(weeklyReport.totalRevenue)}</div>
-                        <div className="text-xs text-gray-600">Ingresos</div>
                       </div>
                     </div>
 
-                    {/* Top Products */}
-                    {Object.keys(weeklyReport.productCounts).length > 0 && (
+                    {/* Pre-order Details */}
+                    {weeklyReport.preOrderDetails.length > 0 && (
                       <div className="p-4 border-t border-gray-100">
-                        <h4 className="font-medium text-gray-900 mb-3">Productos Más Vendidos</h4>
-                        <div className="space-y-2">
-                          {Object.entries(weeklyReport.productCounts)
-                            .sort((a, b) => b[1] - a[1])
-                            .slice(0, 5)
-                            .map(([name, count]) => (
-                              <div key={name} className="flex items-center justify-between text-sm">
-                                <span className="text-gray-700">{name}</span>
-                                <span className="font-medium text-gray-900">{count} unidades</span>
+                        <h4 className="font-medium text-gray-900 mb-3">Detalle de Pre-pedidos</h4>
+                        <div className="space-y-3">
+                          {weeklyReport.preOrderDetails.map((order, index) => (
+                            <div key={index} className="bg-gray-50 rounded-lg p-3">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-mono font-medium text-gray-900">{order.orderNumber}</span>
+                                <span className="text-xs text-gray-500">{order.orderDate}</span>
                               </div>
-                            ))}
+                              <p className="text-sm text-gray-700 mb-1">
+                                <span className="font-medium">Cliente:</span> {order.customerName}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Productos:</span> {order.products.join(', ')}
+                              </p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {weeklyReport.preOrderCount > 0 && (
-                      <div className="p-4 bg-amber-50 border-t border-amber-100">
-                        <div className="flex items-start gap-2">
-                          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                          <div>
-                            <p className="text-sm font-medium text-amber-800">Acción Requerida</p>
-                            <p className="text-xs text-amber-700 mt-1">
-                              Hay {weeklyReport.preOrderCount} productos en pre-pedido que necesitan ser ordenados a proveedores.
-                            </p>
-                          </div>
+                    {weeklyReport.preOrdersOnly === 0 && (
+                      <div className="p-4 bg-green-50 border-t border-green-100">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-5 h-5 text-green-600" />
+                          <p className="text-sm text-green-800">No hay pre-pedidos esta semana.</p>
                         </div>
                       </div>
                     )}

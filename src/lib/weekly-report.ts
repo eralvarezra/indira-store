@@ -11,6 +11,7 @@ interface OrderItem {
 
 interface Order {
   id: string
+  order_number: string | null
   customer_name: string
   phone: string
   items: OrderItem[]
@@ -37,11 +38,13 @@ export interface WeeklyReport {
   startDateFormatted: string
   endDateFormatted: string
   totalOrders: number
-  inStockOrders: number
-  preOrderCount: number
-  inStockCount: number
-  productCounts: Record<string, number>
-  totalRevenue: number
+  preOrdersOnly: number
+  preOrderDetails: {
+    orderNumber: string
+    customerName: string
+    products: string[]
+    orderDate: string
+  }[]
 }
 
 export async function getCurrentCycle(): Promise<WeekCycle | null> {
@@ -80,29 +83,10 @@ export async function getCycleOrders(cycleId: string): Promise<Order[]> {
 }
 
 export function generateWeeklyReport(cycle: WeekCycle, orders: Order[]): WeeklyReport {
-  const totalOrders = orders.length
-
-  // Separate orders by type
-  const inStockOrders = orders.filter(o =>
-    o.items.some((item: OrderItem) => item.type === 'in_stock')
+  // Filter orders that have pre-order items
+  const preOrders = orders.filter(o =>
+    o.items.some((item: OrderItem) => item.type === 'pre_order')
   )
-  const preOrderItems = orders.flatMap(o =>
-    o.items.filter((item: OrderItem) => item.type === 'pre_order')
-  )
-  const inStockItems = orders.flatMap(o =>
-    o.items.filter((item: OrderItem) => item.type === 'in_stock')
-  )
-
-  // Count products
-  const productCounts: Record<string, number> = {}
-  orders.forEach(order => {
-    order.items.forEach((item: OrderItem) => {
-      if (!productCounts[item.name]) {
-        productCounts[item.name] = 0
-      }
-      productCounts[item.name] += item.quantity
-    })
-  })
 
   // Format dates
   const startDate = new Date(cycle.start_date).toLocaleDateString('es-CR', {
@@ -116,18 +100,39 @@ export function generateWeeklyReport(cycle: WeekCycle, orders: Order[]): WeeklyR
     day: 'numeric'
   })
 
+  // Build pre-order details
+  const preOrderDetails = preOrders.map(order => {
+    const orderNumber = order.order_number || `#${order.id.slice(0, 8).toUpperCase()}`
+    const orderDate = new Date(order.created_at).toLocaleDateString('es-CR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
+    // Get only pre-order items
+    const preOrderItems = order.items
+      .filter((item: OrderItem) => item.type === 'pre_order')
+      .map((item: OrderItem) => `${item.name} x${item.quantity}`)
+
+    return {
+      orderNumber,
+      customerName: order.customer_name,
+      products: preOrderItems,
+      orderDate
+    }
+  })
+
   return {
     cycleId: cycle.id,
     startDate: cycle.start_date,
     endDate: cycle.end_date,
     startDateFormatted: startDate,
     endDateFormatted: endDate,
-    totalOrders,
-    inStockOrders: inStockOrders.length,
-    preOrderCount: preOrderItems.length,
-    inStockCount: inStockItems.length,
-    productCounts,
-    totalRevenue: orders.reduce((sum, o) => sum + o.total, 0)
+    totalOrders: orders.length,
+    preOrdersOnly: preOrders.length,
+    preOrderDetails
   }
 }
 
@@ -140,32 +145,24 @@ export async function sendWeeklyReportTelegram(report: WeeklyReport): Promise<vo
     return
   }
 
-  // Sort products by quantity
-  const sortedProducts = Object.entries(report.productCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10) // Top 10 products
+  // Build message
+  let message = `📦 *PRE-PEDIDOS DE LA SEMANA*\n\n`
+  message += `📅 ${report.startDateFormatted} - ${report.endDateFormatted}\n`
+  message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`
 
-  const productList = sortedProducts
-    .map(([name, count]) => `• ${name} → ${count} unidades`)
-    .join('\n')
+  if (report.preOrderDetails.length === 0) {
+    message += `✅ No hay pre-pedidos esta semana.`
+  } else {
+    message += `📋 *Total pre-pedidos:* ${report.preOrdersOnly}\n\n`
 
-  const message = `
-📊 *WEEKLY ORDER REPORT*
-
-📅 *Week:* ${report.startDateFormatted} - ${report.endDateFormatted}
-
-📦 *Total Orders:* ${report.totalOrders}
-
-✅ *In-Stock Items:* ${report.inStockCount}
-📦 *Pre-Order Items:* ${report.preOrderCount}
-
-🏆 *Top Products:*
-${productList || 'No products this week'}
-
-💰 *Total Revenue:* ₡${report.totalRevenue.toFixed(2)} CRC
-
-${report.preOrderCount > 0 ? '⚠️ *Action Required:* Review and place supplier orders for pre-order items.' : '✅ All orders ready for fulfillment.'}
-  `.trim()
+    report.preOrderDetails.forEach((order, index) => {
+      message += `*${order.orderNumber}*\n`
+      message += `👤 ${order.customerName}\n`
+      message += `📦 ${order.products.join(', ')}\n`
+      message += `📅 ${order.orderDate}\n`
+      message += `\n`
+    })
+  }
 
   try {
     const response = await fetch(
