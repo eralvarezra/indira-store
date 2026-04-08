@@ -19,3 +19,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./public/uploads:/app/public/uploads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.indirastore.entrypoints=web,websecure"
+      - "traefik.http.routers.indirastore.rule=Host(`indirastore.online`) || Host(`www.indirastore.online`)"
+      - "traefik.http.routers.indirastore.tls.certresolver=letsencrypt"
+      - "traefik.http.services.indirastore.loadbalancer.server.port=3000"
