@@ -9,6 +9,14 @@ interface SettingRow {
   value: string
 }
 
+// Default settings
+const DEFAULT_SETTINGS = {
+  telegram_bot_token: '',
+  telegram_chat_id: '',
+  site_title: 'Indira Store',
+  site_description: 'Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.'
+}
+
 function verifyAuth(request: NextRequest): boolean {
   const token = request.cookies.get('admin_token')?.value
   if (!token) return false
@@ -30,19 +38,19 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabase()
 
     if (!supabase) {
-      return NextResponse.json({ settings: { telegram_bot_token: '', telegram_chat_id: '' } })
+      return NextResponse.json({ settings: DEFAULT_SETTINGS })
     }
 
     const { data: settings, error } = await supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['telegram_bot_token', 'telegram_chat_id'])
+      .in('key', ['telegram_bot_token', 'telegram_chat_id', 'site_title', 'site_description'])
 
     if (error) {
       return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
     }
 
-    const settingsMap: Record<string, string> = {}
+    const settingsMap: Record<string, string> = { ...DEFAULT_SETTINGS }
     ;(settings as SettingRow[])?.forEach((setting) => {
       settingsMap[setting.key] = setting.value
     })

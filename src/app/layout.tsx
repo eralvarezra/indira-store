@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { DynamicTitle } from "@/components/DynamicTitle";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -17,8 +18,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Indira Store — Skincare",
-  description:
-    "Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.",
+  description: "Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.",
   manifest: "/manifest.json",
   icons: { icon: "/logo.png" },
 };
@@ -45,6 +45,7 @@ export default function RootLayout({
         className="min-h-screen bg-[color:var(--color-cream)] font-sans text-[color:var(--color-ink)] overflow-x-hidden"
         suppressHydrationWarning
       >
+        <DynamicTitle />
         {children}
       </body>
     </html>

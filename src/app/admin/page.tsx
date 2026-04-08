@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('products')
   const [products, setProducts] = useState<ProductWithVariants[]>([])
   const [orders, setOrders] = useState<Order[]>([])
-  const [settings, setSettings] = useState({ telegram_bot_token: '', telegram_chat_id: '' })
+  const [settings, setSettings] = useState({ telegram_bot_token: '', telegram_chat_id: '', site_title: 'Indira Store', site_description: 'Explora nuestro catálogo de productos de skincare y realiza tu pedido de forma fácil y rápida.' })
   const [shippingInstructions, setShippingInstructions] = useState({
     pickup: 'Nuestro horario de atención es de Lunes a Viernes de 9:00 AM a 6:00 PM y Sábados de 9:00 AM a 3:00 PM.',
     gam: 'El paquete será entregado en la dirección indicada en 2-3 días hábiles.',
@@ -2267,6 +2267,37 @@ export default function AdminDashboard() {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div className="space-y-8">
+                {/* Site Settings */}
+                <div className="max-w-lg">
+                  <h2 className="text-lg font-semibold mb-4">Configuración del Sitio</h2>
+                  <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre de la Tienda
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.site_title || ''}
+                        onChange={(e) => setSettings({ ...settings, site_title: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors"
+                        placeholder="Indira Store"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Descripción
+                      </label>
+                      <textarea
+                        value={settings.site_description || ''}
+                        onChange={(e) => setSettings({ ...settings, site_description: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#f6a07a] outline-none transition-colors resize-none"
+                        rows={3}
+                        placeholder="Explora nuestro catálogo de productos de skincare..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Telegram Settings */}
                 <div className="max-w-lg">
                   <h2 className="text-lg font-semibold mb-4">Configuración de Telegram</h2>
