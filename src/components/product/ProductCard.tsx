@@ -109,12 +109,9 @@ export function ProductCard({ product, onOpenDetail }: ProductCardProps) {
 
       {/* Content */}
       <div className="p-3 sm:p-4">
-        <h3 className="font-display text-base sm:text-lg leading-tight text-[color:var(--color-ink)] mb-1 line-clamp-1">
+        <h3 className="font-display text-base sm:text-lg leading-tight text-[color:var(--color-ink)] mb-3">
           {product.name}
         </h3>
-        <p className="text-[color:var(--color-ink-soft)] text-xs sm:text-sm mb-3 line-clamp-2">
-          {product.description || '\u00A0'}
-        </p>
 
         {/* Price */}
         <div className="mb-3">

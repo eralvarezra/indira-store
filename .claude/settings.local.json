@@ -55,7 +55,8 @@
       "Bash(git:*)",
       "Bash(powershell:*)",
       "Bash(cmd.exe:*)",
-      "Bash(/c/ProgramData/chocolatey/bin/PLINK.EXE:*)"
+      "Bash(/c/ProgramData/chocolatey/bin/PLINK.EXE:*)",
+      "Bash(nslookup decompritas.com)"
     ]
   }
 }
