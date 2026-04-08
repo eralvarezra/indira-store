@@ -17,6 +17,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [isAdding, setIsAdding] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [stockWarning, setStockWarning] = useState<string | null>(null)
 
   // Get variants and images
   const variants = product.variants || []
@@ -54,8 +55,25 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
   const handleAdd = () => {
     setIsAdding(true)
-    addItem(product, selectedVariant || undefined)
+    setStockWarning(null)
+    const result = addItem(product, selectedVariant || undefined)
+    if (!result.success && result.message) {
+      setStockWarning(result.message)
+    }
     setTimeout(() => setIsAdding(false), 300)
+  }
+
+  const handleIncrement = () => {
+    setStockWarning(null)
+    const result = updateQuantity(product.id, quantity + 1, selectedVariant?.id)
+    if (!result.success && result.message) {
+      setStockWarning(result.message)
+    }
+  }
+
+  const handleDecrement = () => {
+    setStockWarning(null)
+    updateQuantity(product.id, quantity - 1, selectedVariant?.id)
   }
 
   const formatPrice = (price: number) => {
@@ -298,17 +316,25 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
         {/* Footer with Add to Cart */}
         <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 sm:p-5 safe-bottom">
+          {/* Stock warning message */}
+          {stockWarning && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <span className="text-sm text-red-700">{stockWarning}</span>
+            </div>
+          )}
+
           {quantity > 0 ? (
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => updateQuantity(product.id, quantity - 1, selectedVariant?.id)}
+                onClick={handleDecrement}
                 className="w-14 h-14 rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center transition-colors touch-target"
               >
                 <Minus className="w-6 h-6 text-gray-700" />
               </button>
               <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
               <button
-                onClick={handleAdd}
+                onClick={handleIncrement}
                 disabled={!isOutOfStock && quantity >= availableStock}
                 className={clsx(
                   "w-14 h-14 rounded-full flex items-center justify-center transition-colors touch-target",

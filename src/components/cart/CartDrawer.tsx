@@ -1,8 +1,9 @@
 'use client'
 
 import { useCart } from '@/context/CartContext'
-import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package } from 'lucide-react'
+import { X, Plus, Minus, Trash2, ShoppingBag, Clock, Package, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
+import { useState } from 'react'
 import { getDiscountedPrice, getEffectivePrice, getEffectiveStock, getAvailableStock, getCartItemId } from '@/types/database.types'
 
 interface CartDrawerProps {
@@ -12,6 +13,7 @@ interface CartDrawerProps {
 export function CartDrawer({ onCheckout }: CartDrawerProps) {
   const { state, closeCart, updateQuantity, removeItem, clearCart, totalItems, totalPrice } =
     useCart()
+  const [stockWarning, setStockWarning] = useState<string | null>(null)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CR', {
@@ -31,6 +33,23 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
   })
 
   const hasPreOrderItems = preOrderItems.length > 0
+
+  const handleIncrement = (productId: string, currentQuantity: number, variantId?: string, availableStock?: number) => {
+    setStockWarning(null)
+    if (availableStock !== undefined && currentQuantity >= availableStock) {
+      setStockWarning(`Solo hay ${availableStock} unidades disponibles`)
+      return
+    }
+    const result = updateQuantity(productId, currentQuantity + 1, variantId)
+    if (!result.success && result.message) {
+      setStockWarning(result.message)
+    }
+  }
+
+  const handleDecrement = (productId: string, currentQuantity: number, variantId?: string) => {
+    setStockWarning(null)
+    updateQuantity(productId, currentQuantity - 1, variantId)
+  }
 
   // Calculate payment breakdown
   // In-stock items: 100% | Pre-order items: 50% advance
@@ -89,6 +108,14 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
 
         {/* Content */}
         <div className="flex flex-col h-[calc(100vh-130px)] sm:h-[calc(100vh-140px)]">
+          {/* Stock warning message */}
+          {stockWarning && (
+            <div className="mx-4 mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+              <span className="text-sm text-red-700">{stockWarning}</span>
+            </div>
+          )}
+
           {state.items.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -161,7 +188,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                               <div className="flex items-center justify-between mt-2">
                                 <div className="flex items-center gap-1">
                                   <button
-                                    onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.variant?.id)}
+                                    onClick={() => handleDecrement(item.product.id, item.quantity, item.variant?.id)}
                                     className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors touch-target"
                                   >
                                     <Minus className="w-3.5 h-3.5 text-gray-600" />
@@ -170,7 +197,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                                     {item.quantity}
                                   </span>
                                   <button
-                                    onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.variant?.id)}
+                                    onClick={() => handleIncrement(item.product.id, item.quantity, item.variant?.id, availableStock)}
                                     disabled={item.quantity >= availableStock}
                                     className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target"
                                   >
@@ -265,7 +292,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                               <div className="flex items-center justify-between mt-2">
                                 <div className="flex items-center gap-1">
                                   <button
-                                    onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.variant?.id)}
+                                    onClick={() => handleDecrement(item.product.id, item.quantity, item.variant?.id)}
                                     className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center active:bg-amber-100 transition-colors touch-target"
                                   >
                                     <Minus className="w-3.5 h-3.5 text-gray-600" />
@@ -274,7 +301,7 @@ export function CartDrawer({ onCheckout }: CartDrawerProps) {
                                     {item.quantity}
                                   </span>
                                   <button
-                                    onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.variant?.id)}
+                                    onClick={() => handleIncrement(item.product.id, item.quantity, item.variant?.id)}
                                     className="w-8 h-8 rounded-full bg-white border border-amber-200 flex items-center justify-center active:bg-amber-100 transition-colors touch-target"
                                   >
                                     <Plus className="w-3.5 h-3.5 text-gray-600" />

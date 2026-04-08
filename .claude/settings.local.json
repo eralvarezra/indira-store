@@ -41,7 +41,16 @@
       "Bash(\"C:\\\\ProgramData\\\\chocolatey\\\\bin\\\\plink.exe\" -ssh root@135.181.37.72 -pw \"53403E@@r\" -batch \"echo connected\")",
       "Bash(\"C:\\\\ProgramData\\\\chocolatey\\\\bin\\\\plink.exe\" -ssh root@135.181.37.72 -pw \"53403E@@r\" \"echo connected\")",
       "Bash(\"C:\\\\ProgramData\\\\chocolatey\\\\bin\\\\plink.exe\" -v -ssh root@135.181.37.72 -pw \"53403E@@r\" \"echo test\")",
-      "Read(//dev/**)"
+      "Read(//dev/**)",
+      "Bash(where ssh:*)",
+      "Bash(choco --version)",
+      "Bash(choco search:*)",
+      "Bash(dir \"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\")",
+      "Bash(dir \"C:\\\\Program Files \\(x86\\)\\\\PuTTY\\\\plink.exe\")",
+      "Bash(ping:*)",
+      "Bash(cmd:*)",
+      "Bash(printf 'y\\\\n')",
+      "Bash(powershell.exe:*)"
     ]
   }
 }
