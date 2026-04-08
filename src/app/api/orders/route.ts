@@ -265,7 +265,8 @@ export async function POST(request: NextRequest) {
       items: processedItems,
       total: body.total,
       total_with_shipping: totalWithShipping,
-      amount_paid: 0,
+      // When payment proof is provided, mark the advance payment as paid
+      amount_paid: body.payment_proof_url ? advancePayment : 0,
       advance_payment: advancePayment,
       status: 'pending',
       week_cycle_id: weekCycleId,
