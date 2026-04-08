@@ -79,7 +79,7 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
       className={clsx(
         "relative bg-white rounded-2xl border border-[color:var(--color-hairline)] overflow-hidden transition-all duration-300",
         isExpanded
-          ? "col-span-full shadow-2xl z-20 scale-[1.02]"
+          ? "col-span-full row-span-1 shadow-2xl z-20"
           : "hover:-translate-y-0.5 hover:shadow-[0_14px_40px_-18px_rgba(31,26,23,0.25)]"
       )}
     >
@@ -236,56 +236,57 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
 
       {/* Expanded View */}
       {isExpanded && (
-        <div className="p-4 sm:p-6 animate-in fade-in slide-up duration-200">
+        <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-2 right-2 z-30 w-10 h-10 flex items-center justify-center bg-[color:var(--color-cream)] hover:bg-[color:var(--color-cream-dark)] rounded-full transition-colors shadow-sm"
+            className="absolute top-3 right-3 z-30 w-10 h-10 flex items-center justify-center bg-[color:var(--color-cream)] hover:bg-[color:var(--color-cream-dark)] rounded-full transition-colors shadow-sm"
           >
             <X className="w-5 h-5 text-[color:var(--color-ink)]" />
           </button>
 
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Product Image */}
-            <div className="md:w-1/2 lg:w-2/5">
-              <div className="relative aspect-square bg-[color:var(--color-cream)] rounded-2xl overflow-hidden flex items-center justify-center">
+          <div className="flex flex-col sm:flex-row gap-6 lg:gap-10">
+            {/* Product Image - Larger */}
+            <div className="sm:w-2/5 lg:w-1/3 flex-shrink-0">
+              <div className="relative aspect-square bg-[color:var(--color-cream)] rounded-3xl overflow-hidden flex items-center justify-center shadow-inner">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="max-w-full max-h-full object-contain"
+                    className="w-full h-full object-contain p-4"
                   />
                 ) : (
-                  <ShoppingCart className="w-20 h-20 text-[color:var(--color-ink-soft)]/30" />
+                  <ShoppingCart className="w-24 h-24 text-[color:var(--color-ink-soft)]/20" />
                 )}
 
                 {hasDiscount && (
-                  <div className="absolute top-3 left-3 bg-[color:var(--color-brand)] text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                  <div className="absolute top-4 left-4 bg-[color:var(--color-brand)] text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-lg">
                     −{discountPercentage}%
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Product Details */}
-            <div className="md:w-1/2 lg:w-3/5 flex flex-col">
-              <h2 className="font-display text-2xl sm:text-3xl text-[color:var(--color-ink)] mb-2">
+            {/* Product Details - More spacious */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Name */}
+              <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl text-[color:var(--color-ink)] mb-3 leading-tight">
                 {product.name}
               </h2>
 
               {/* Price */}
-              <div className="mb-4">
+              <div className="mb-5">
                 {hasDiscount ? (
-                  <div className="flex items-baseline gap-3">
-                    <del className="text-lg text-[color:var(--color-ink-soft)]">
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <del className="text-xl text-[color:var(--color-ink-soft)]">
                       {formatPrice(effectivePrice)}
                     </del>
-                    <ins className="no-underline text-2xl font-display font-bold text-[color:var(--color-brand)]">
+                    <ins className="no-underline text-3xl lg:text-4xl font-display font-bold text-[color:var(--color-brand)]">
                       {formatPrice(discountedPrice)}
                     </ins>
                   </div>
                 ) : (
-                  <span className="text-2xl font-display font-bold text-[color:var(--color-brand)]">
+                  <span className="text-3xl lg:text-4xl font-display font-bold text-[color:var(--color-brand)]">
                     {formatPrice(effectivePrice)}
                   </span>
                 )}
@@ -293,8 +294,8 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
 
               {/* Variant Selector */}
               {hasMultipleVariants && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-[color:var(--color-ink-soft)] mb-2 uppercase tracking-wider">
+                <div className="mb-5">
+                  <h3 className="text-xs font-medium text-[color:var(--color-ink-soft)] mb-3 uppercase tracking-wider">
                     Seleccionar opción
                   </h3>
                   <div className="flex flex-wrap gap-2">
@@ -309,14 +310,14 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
                           key={variant.id}
                           onClick={() => setSelectedVariantId(variant.id)}
                           className={clsx(
-                            'px-4 py-3 rounded-xl border-2 transition-all text-left min-w-[120px]',
+                            'px-5 py-3 rounded-xl border-2 transition-all text-left min-w-[130px]',
                             isSelected
                               ? 'border-[color:var(--color-brand)] bg-[color:var(--color-brand-tint)] shadow-sm'
-                              : 'border-[color:var(--color-hairline)] hover:border-[color:var(--color-brand)]/50'
+                              : 'border-[color:var(--color-hairline)] hover:border-[color:var(--color-brand)]/50 hover:bg-[color:var(--color-cream)]'
                           )}
                         >
                           <div className="font-medium text-[color:var(--color-ink)]">{variant.name}</div>
-                          <div className="text-sm text-[color:var(--color-ink-soft)]">
+                          <div className="text-sm text-[color:var(--color-ink-soft)] mt-0.5">
                             {formatPrice(variantDiscountedPrice)}
                           </div>
                           {variantStock <= 0 && (
@@ -333,37 +334,37 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
               )}
 
               {/* Description */}
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-[color:var(--color-ink-soft)] mb-1 uppercase tracking-wider">
+              <div className="mb-5">
+                <h3 className="text-xs font-medium text-[color:var(--color-ink-soft)] mb-2 uppercase tracking-wider">
                   Descripción
                 </h3>
-                <p className="text-[color:var(--color-ink)] whitespace-pre-wrap">
+                <p className="text-[color:var(--color-ink)] text-base lg:text-lg leading-relaxed whitespace-pre-wrap">
                   {product.description || 'Sin descripción disponible'}
                 </p>
               </div>
 
               {/* Stock Status */}
-              <div className="mb-4">
+              <div className="mb-6">
                 {hasStockAvailable ? (
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700">
+                  <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700">
                     {availableStock} disponibles
                   </span>
                 ) : isAllStockReserved ? (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-red-800">Stock reservado</p>
-                      <p className="text-xs text-red-700 mt-1">
+                      <p className="text-sm text-red-700 mt-1">
                         Este producto tiene {effectiveStock} unidades pero están reservadas en pedidos pendientes.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
                     <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-amber-800">Pre-pedido disponible</p>
-                      <p className="text-xs text-amber-700 mt-1">
+                      <p className="text-sm text-amber-700 mt-1">
                         Entrega en aproximadamente 1.5 semanas.
                       </p>
                     </div>
@@ -374,7 +375,7 @@ export function ProductCard({ product, isExpanded, onExpand, onClose }: ProductC
               {/* Add to Cart */}
               <div className="mt-auto pt-4">
                 {selectedVariantQuantity > 0 ? (
-                  <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center justify-center gap-6">
                     <button
                       onClick={() => updateQuantity(product.id, selectedVariantQuantity - 1, selectedVariant?.id)}
                       className="w-14 h-14 rounded-full bg-[color:var(--color-cream-dark)] hover:bg-[color:var(--color-hairline)] flex items-center justify-center transition-colors"
