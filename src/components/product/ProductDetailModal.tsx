@@ -167,7 +167,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   onClick={() => setSelectedImageIndex(index)}
                   className={clsx(
                     'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors bg-gray-50 flex items-center justify-center',
-                    index === selectedImageIndex ? 'border-[#E8775A]' : 'border-transparent hover:border-gray-300'
+                    index === selectedImageIndex ? 'border-[color:var(--color-brand)]' : 'border-transparent hover:border-[color:var(--color-hairline)]'
                   )}
                 >
                   <img
@@ -193,12 +193,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     <span className="text-sm text-gray-400 line-through block">
                       {formatPrice(effectivePrice)}
                     </span>
-                    <span className="text-xl font-bold text-[#E8775A]">
+                    <span className="text-xl font-bold text-[color:var(--color-brand)] font-display">
                       {formatPrice(discountedPrice)}
                     </span>
                   </>
                 ) : (
-                  <span className="text-xl font-bold text-[#E8775A]">
+                  <span className="text-xl font-bold text-[color:var(--color-brand)] font-display">
                     {formatPrice(effectivePrice)}
                   </span>
                 )}
@@ -219,7 +219,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                         className={clsx(
                           'px-4 py-2.5 rounded-xl border-2 transition-all text-left',
                           selectedVariant?.id === variant.id
-                            ? 'border-[#E8775A] bg-[#E8775A]/10'
+                            ? 'border-[color:var(--color-brand)] bg-[color:var(--color-brand-tint)]'
                             : 'border-gray-200 hover:border-gray-300 active:bg-gray-50'
                         )}
                       >
@@ -291,7 +291,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   "w-14 h-14 rounded-full flex items-center justify-center transition-colors touch-target",
                   isOutOfStock
                     ? "bg-amber-500 hover:bg-amber-400 active:bg-amber-600"
-                    : "bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]"
+                    : "bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)]"
                 )}
               >
                 <Plus className="w-6 h-6 text-white" />
@@ -305,7 +305,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                 'w-full py-4 sm:py-5 rounded-2xl font-semibold text-white text-lg transition-all touch-target flex items-center justify-center gap-2',
                 isOutOfStock
                   ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600'
-                  : 'bg-[#f6a07a] hover:bg-[#ffb599] active:bg-[#e58e6a]',
+                  : 'bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)]',
                 (hasMultipleVariants && !selectedVariant) && 'opacity-50 cursor-not-allowed',
                 isAdding && 'scale-[1.02]'
               )}

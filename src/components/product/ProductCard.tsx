@@ -1,8 +1,14 @@
 'use client'
 
-import { Product, ProductVariant, ProductWithVariants, getDiscountedPrice, getEffectivePrice, getEffectiveStock, getCartItemId } from '@/types/database.types'
+import {
+  ProductWithVariants,
+  getDiscountedPrice,
+  getEffectivePrice,
+  getEffectiveStock,
+  getCartItemId,
+} from '@/types/database.types'
 import { useCart } from '@/context/CartContext'
-import { ShoppingCart, Plus, Minus, Clock } from 'lucide-react'
+import { ShoppingCart, Plus, Minus } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
 import { ProductDetailModal } from './ProductDetailModal'
@@ -16,101 +22,87 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showDetail, setShowDetail] = useState(false)
 
-  // Get variants for this product
   const variants = product.variants || []
   const hasMultipleVariants = variants.length > 1
-
-  // Get default or first variant
   const defaultVariant = variants.find(v => v.is_default) || variants[0]
 
-  // Calculate total quantity across all variants
   const totalQuantity = state.items
-    .filter((item) => item.product.id === product.id)
+    .filter(item => item.product.id === product.id)
     .reduce((sum, item) => sum + item.quantity, 0)
 
-  // Get quantity for default variant (if no variants, use product itself)
   const defaultVariantQuantity = defaultVariant
-    ? state.items.find((item) => getCartItemId(item) === `${product.id}-${defaultVariant.id}`)?.quantity || 0
-    : state.items.find((item) => item.product.id === product.id && !item.variant)?.quantity || 0
+    ? state.items.find(item => getCartItemId(item) === `${product.id}-${defaultVariant.id}`)?.quantity || 0
+    : state.items.find(item => item.product.id === product.id && !item.variant)?.quantity || 0
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation()
-
-    // If multiple variants, open detail modal
     if (hasMultipleVariants) {
       setShowDetail(true)
       return
     }
-
     setIsAdding(true)
     addItem(product, defaultVariant)
     setTimeout(() => setIsAdding(false), 300)
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CR', {
-      style: 'currency',
-      currency: 'CRC',
-    }).format(price)
-  }
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC' }).format(price)
 
-  // Calculate effective values
   const effectivePrice = defaultVariant ? getEffectivePrice(product, defaultVariant) : product.price
   const effectiveStock = defaultVariant ? getEffectiveStock(product, defaultVariant) : product.stock
   const isOutOfStock = effectiveStock <= 0
 
-  // Get discount percentage
   const discountPercentage = product.discount_percentage || 0
   const hasDiscount = discountPercentage > 0
   const discountedPrice = getDiscountedPrice(effectivePrice, discountPercentage)
 
-  // Price range for products with multiple variants
-  const priceRange = hasMultipleVariants && variants.length > 0 ? {
-    min: Math.min(...variants.map(v => v.price)),
-    max: Math.max(...variants.map(v => v.price))
-  } : null
+  const priceRange = hasMultipleVariants && variants.length > 0
+    ? { min: Math.min(...variants.map(v => v.price)), max: Math.max(...variants.map(v => v.price)) }
+    : null
 
   return (
     <>
       <div
-        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-lg active:scale-[0.98] cursor-pointer"
+        className="group relative bg-white rounded-2xl border border-[color:var(--color-hairline)] overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_40px_-18px_rgba(31,26,23,0.25)] active:scale-[0.99] cursor-pointer"
         onClick={() => setShowDetail(true)}
       >
-        {/* Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-gray-50 flex items-center justify-center">
+        {/* Image */}
+        <div className="relative aspect-square overflow-hidden bg-[color:var(--color-cream)] flex items-center justify-center">
           {product.image_url ? (
             <img
               src={product.image_url}
               alt={product.name}
-              className="max-w-full max-h-full object-contain"
+              className="max-w-full max-h-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-              <ShoppingCart className="w-12 h-12 text-gray-300" />
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[color:var(--color-cream)] to-[color:var(--color-cream-dark)]">
+              <ShoppingCart className="w-12 h-12 text-[color:var(--color-ink-soft)]/40" />
             </div>
           )}
 
-          {/* Discount Badge */}
+          {/* Discount badge */}
           {hasDiscount && !isOutOfStock && (
-            <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
-              -{discountPercentage}%
+            <div className="absolute top-2 left-2 bg-[color:var(--color-brand)] text-white px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm -rotate-3">
+              −{discountPercentage}%
             </div>
           )}
 
-          {/* Multiple Variants Badge */}
+          {/* Variants badge */}
           {hasMultipleVariants && (
-            <div className="absolute top-2 right-2 bg-indigo-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+            <div className="absolute top-2 right-2 bg-[color:var(--color-ink)] text-[color:var(--color-cream)] px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider">
               {variants.length} opciones
             </div>
           )}
 
-          {/* Quantity Badge */}
+          {/* Quantity badge */}
           {totalQuantity > 0 && !hasMultipleVariants && (
-            <div className={clsx(
-              "absolute top-2 right-2 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg",
-              isOutOfStock ? "bg-amber-500" : "bg-[#f6a07a]"
-            )}>
+            <div
+              className={clsx(
+                'absolute top-2 right-2 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm',
+                isOutOfStock ? 'bg-amber-600' : 'bg-[color:var(--color-ink)]'
+              )}
+            >
               {totalQuantity}
             </div>
           )}
@@ -118,98 +110,96 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Content */}
         <div className="p-3 sm:p-4">
-          <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1 line-clamp-1">
+          <h3 className="font-display text-base sm:text-lg leading-tight text-[color:var(--color-ink)] mb-1 line-clamp-1">
             {product.name}
           </h3>
-          <p className="text-gray-500 text-xs sm:text-sm mb-2 line-clamp-2 min-h-[2rem]">
-            {product.description}
+          <p className="text-[color:var(--color-ink-soft)] text-xs sm:text-sm mb-3 line-clamp-2">
+            {product.description || '\u00A0'}
           </p>
 
           {/* Price */}
-          <div className="mb-2">
+          <div className="mb-3">
             {hasMultipleVariants && priceRange ? (
               <div>
-                <span className="text-base sm:text-lg font-bold text-[#E8775A]">
+                <span className="text-base sm:text-lg font-display font-semibold text-[color:var(--color-brand)]">
                   {formatPrice(getDiscountedPrice(priceRange.min, discountPercentage))}
                 </span>
                 {priceRange.max !== priceRange.min && (
-                  <span className="text-sm text-gray-500 ml-1">
-                    - {formatPrice(getDiscountedPrice(priceRange.max, discountPercentage))}
+                  <span className="text-sm text-[color:var(--color-ink-soft)] ml-1">
+                    — {formatPrice(getDiscountedPrice(priceRange.max, discountPercentage))}
                   </span>
                 )}
               </div>
             ) : hasDiscount ? (
-              <>
-                <span className="text-xs sm:text-sm text-gray-400 line-through">
+              <div className="flex items-baseline gap-2">
+                <del className="text-xs sm:text-sm text-[color:var(--color-ink-soft)]/60">
                   {formatPrice(effectivePrice)}
-                </span>
-                <span className="text-base sm:text-lg font-bold text-[#E8775A] ml-2">
+                </del>
+                <ins className="no-underline text-base sm:text-lg font-display font-semibold text-[color:var(--color-brand)]">
                   {formatPrice(discountedPrice)}
-                </span>
-              </>
+                </ins>
+              </div>
             ) : (
-              <span className="text-base sm:text-lg font-bold text-[#E8775A]">
+              <span className="text-base sm:text-lg font-display font-semibold text-[color:var(--color-brand)]">
                 {formatPrice(effectivePrice)}
               </span>
             )}
           </div>
 
-          {/* Stock status message for out of stock */}
           {isOutOfStock && !hasMultipleVariants && (
-            <p className="text-xs text-amber-600 mb-2">
+            <p className="text-[10px] uppercase tracking-wider text-amber-700 mb-2">
               Entrega en ~1.5 semanas
             </p>
           )}
 
-          {/* Add to cart / Quantity controls */}
+          {/* Actions */}
           {hasMultipleVariants ? (
             <button
               onClick={handleAdd}
-              className={clsx(
-                'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
-                'bg-[#f6a07a] text-white active:bg-[#e58e6a] active:scale-95'
-              )}
+              className="w-full py-2 rounded-full text-xs uppercase tracking-wider font-semibold border border-[color:var(--color-ink)] text-[color:var(--color-ink)] hover:bg-[color:var(--color-ink)] hover:text-[color:var(--color-cream)] transition-colors touch-target"
             >
               Ver opciones
             </button>
           ) : defaultVariantQuantity > 0 ? (
             <div
               className="flex items-center justify-center gap-2"
-              onClick={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
             >
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   updateQuantity(product.id, defaultVariantQuantity - 1, defaultVariant?.id)
                 }}
-                className="w-9 h-9 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors touch-target"
+                className="w-9 h-9 rounded-full border border-[color:var(--color-hairline)] hover:border-[color:var(--color-ink)] flex items-center justify-center transition-colors touch-target"
               >
-                <Minus className="w-4 h-4 text-gray-600" />
+                <Minus className="w-4 h-4 text-[color:var(--color-ink)]" />
               </button>
-              <span className="w-8 text-center font-semibold">{defaultVariantQuantity}</span>
+              <span className="w-8 text-center font-display font-semibold text-[color:var(--color-ink)]">
+                {defaultVariantQuantity}
+              </span>
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   addItem(product, defaultVariant)
                 }}
                 className={clsx(
-                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors touch-target",
+                  'w-9 h-9 rounded-full flex items-center justify-center transition-colors touch-target text-white',
                   isOutOfStock
-                    ? "bg-amber-500 active:bg-amber-600"
-                    : "bg-[#f6a07a] active:bg-[#e58e6a]"
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)]'
                 )}
               >
-                <Plus className="w-4 h-4 text-white" />
+                <Plus className="w-4 h-4" />
               </button>
             </div>
           ) : (
             <button
               onClick={handleAdd}
               className={clsx(
-                'w-full py-2 rounded-full font-medium text-sm transition-all duration-200 touch-target',
+                'w-full py-2 rounded-full text-xs uppercase tracking-wider font-semibold transition-all duration-200 touch-target text-white',
                 isOutOfStock
-                  ? 'bg-amber-500 text-white active:bg-amber-600 active:scale-95'
-                  : 'bg-[#f6a07a] text-white active:bg-[#e58e6a] active:scale-95',
+                  ? 'bg-amber-600 hover:bg-amber-700 active:scale-95'
+                  : 'bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)] active:scale-95',
                 isAdding && 'scale-105'
               )}
             >
@@ -219,7 +209,6 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
       </div>
 
-      {/* Detail Modal */}
       <ProductDetailModal
         product={product}
         isOpen={showDetail}
