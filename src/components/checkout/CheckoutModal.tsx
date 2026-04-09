@@ -385,7 +385,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       />
 
       {/* Modal - Bottom sheet on mobile, larger for checkout */}
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95vh] overflow-hidden animate-in fade-in slide-up duration-200">
+      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95vh] overflow-hidden animate-in fade-in slide-up duration-200 flex flex-col">
         {/* Drag handle for mobile */}
         <div className="flex justify-center pt-3 sm:hidden">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
@@ -561,8 +561,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="overflow-y-auto scroll-container" style={{ maxHeight: 'calc(95vh - 120px)' }}>
-              <div className="p-4 sm:p-6 pb-20 space-y-6">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto scroll-container">
+              <div className="p-4 sm:p-6 pb-24 space-y-6">
 
                 {/* Contact Section */}
                 <section>
