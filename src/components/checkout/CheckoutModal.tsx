@@ -1155,6 +1155,12 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </div>
 
                 {/* Submit Button */}
+                <p className="text-xs text-gray-500 text-center whitespace-normal break-words px-2 mb-3">
+                  {hasPreOrderItems
+                    ? 'Te contactaremos para coordinar el pago del adelanto y la entrega.'
+                    : 'Te contactaremos para coordinar el pago y la entrega.'}
+                </p>
+
                 <button
                   type="submit"
                   disabled={isSubmitting || state.items.length === 0}
@@ -1176,12 +1182,6 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     `Confirmar Pedido - ${formatPrice(totalWithShipping)}`
                   )}
                 </button>
-
-                <p className="text-xs text-gray-500 text-center whitespace-normal break-words px-2">
-                  {hasPreOrderItems
-                    ? 'Te contactaremos para coordinar el pago del adelanto y la entrega.'
-                    : 'Te contactaremos para coordinar el pago y la entrega.'}
-                </p>
               </div>
             </form>
           </>
