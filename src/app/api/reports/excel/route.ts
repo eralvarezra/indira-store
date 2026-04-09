@@ -76,6 +76,28 @@ export async function GET(request: NextRequest) {
     const ordersSheet = XLSX.utils.json_to_sheet(ordersData)
     XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Pedidos Pre-pedido')
 
+    // Sheet 2: Simple Format (Pedido, Productos, Fecha)
+    const simpleData = preOrderOrders.map(order => {
+      const orderNumber = (order as Order & { order_number?: string | null }).order_number || `#${order.id.substring(0, 8).toUpperCase()}`
+      const preOrderItems = order.items
+        .filter(item => item.type === 'pre_order')
+        .map(item => item.name)
+      const orderDate = new Date(order.created_at).toLocaleDateString('es-CR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+
+      return {
+        'Pedido': orderNumber,
+        'Productos': preOrderItems.join(', '),
+        'Fecha': orderDate
+      }
+    })
+
+    const simpleSheet = XLSX.utils.json_to_sheet(simpleData)
+    XLSX.utils.book_append_sheet(workbook, simpleSheet, 'Lista Simple')
+
     // Sheet 2: Pre-order Products Summary (only pre-order items)
     const productCounts: Record<string, { quantity: number; revenue: number }> = {}
 
