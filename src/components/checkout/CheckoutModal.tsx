@@ -561,8 +561,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="overflow-y-auto scroll-container" style={{ maxHeight: 'calc(95vh - 180px)' }}>
-              <div className="p-4 sm:p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="overflow-y-auto scroll-container" style={{ maxHeight: 'calc(95vh - 140px)' }}>
+              <div className="p-4 sm:p-6 pb-8 space-y-6">
 
                 {/* Contact Section */}
                 <section>
