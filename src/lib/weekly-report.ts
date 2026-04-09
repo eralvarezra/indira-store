@@ -145,25 +145,58 @@ export async function sendWeeklyReportTelegram(report: WeeklyReport): Promise<vo
     return
   }
 
-  // Build message
-  let message = `📦 *PRE-PEDIDOS DE LA SEMANA*\n\n`
-  message += `📅 ${report.startDateFormatted} - ${report.endDateFormatted}\n`
-  message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`
+  // Telegram has a 4096 character limit per message
+  const MAX_MESSAGE_LENGTH = 4000 // Leave some buffer
+
+  // Build header
+  const header = `📦 *PRE-PEDIDOS DE LA SEMANA*\n\n📅 ${report.startDateFormatted} - ${report.endDateFormatted}\n━━━━━━━━━━━━━━━━━━━━━━\n\n`
 
   if (report.preOrderDetails.length === 0) {
-    message += `✅ No hay pre-pedidos esta semana.`
-  } else {
-    message += `📋 *Total pre-pedidos:* ${report.preOrdersOnly}\n\n`
-
-    report.preOrderDetails.forEach((order, index) => {
-      message += `*${order.orderNumber}*\n`
-      message += `👤 ${order.customerName}\n`
-      message += `📦 ${order.products.join(', ')}\n`
-      message += `📅 ${order.orderDate}\n`
-      message += `\n`
-    })
+    // Send single message if no pre-orders
+    const message = header + `✅ No hay pre-pedidos esta semana.`
+    await sendTelegramMessage(botToken, chatId, message)
+    return
   }
 
+  // Build summary
+  const summary = `📋 *Total pre-pedidos:* ${report.preOrdersOnly}\n\n`
+
+  // Build order entries
+  const orderEntries = report.preOrderDetails.map(order => {
+    const entry = `*${order.orderNumber}*\n`
+      + `👤 ${order.customerName}\n`
+      + `📦 ${order.products.join(', ')}\n`
+      + `📅 ${order.orderDate}\n\n`
+    return entry
+  })
+
+  // Split into multiple messages if needed
+  const messages: string[] = []
+  let currentMessage = header + summary
+
+  for (const entry of orderEntries) {
+    if (currentMessage.length + entry.length > MAX_MESSAGE_LENGTH) {
+      // Save current message and start a new one
+      messages.push(currentMessage.trim())
+      currentMessage = `📦 *PRE-PEDIDOS (continuación)*\n━━━━━━━━━━━━━━━━━━━━━━\n\n`
+    }
+    currentMessage += entry
+  }
+
+  // Add last message
+  if (currentMessage.trim().length > 0) {
+    messages.push(currentMessage.trim())
+  }
+
+  // Send all messages
+  for (const message of messages) {
+    await sendTelegramMessage(botToken, chatId, message)
+    // Small delay between messages to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+}
+
+async function sendTelegramMessage(botToken: string, chatId: string, message: string): Promise<void> {
   try {
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
@@ -185,7 +218,7 @@ export async function sendWeeklyReportTelegram(report: WeeklyReport): Promise<vo
       console.error('Telegram API error:', errorData)
     }
   } catch (error) {
-    console.error('Weekly report Telegram error:', error)
+    console.error('Telegram send error:', error)
   }
 }
 
