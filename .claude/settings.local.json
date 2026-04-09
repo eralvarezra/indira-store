@@ -57,7 +57,8 @@
       "Bash(cmd.exe:*)",
       "Bash(/c/ProgramData/chocolatey/bin/PLINK.EXE:*)",
       "Bash(nslookup decompritas.com)",
-      "Bash(pageant -l)"
+      "Bash(pageant -l)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

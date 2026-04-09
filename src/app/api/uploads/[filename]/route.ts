@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { readFile, access } from 'fs/promises'
 import path from 'path'
+
+// Use absolute path since process.cwd() might not be reliable in standalone mode
+const UPLOADS_DIR = '/app/public/uploads'
 
 export async function GET(
   request: NextRequest,
@@ -15,10 +17,12 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
     }
 
-    const filepath = path.join(process.cwd(), 'public', 'uploads', filename)
+    const filepath = path.join(UPLOADS_DIR, filename)
 
-    // Check if file exists
-    if (!existsSync(filepath)) {
+    // Check if file exists and is readable
+    try {
+      await access(filepath)
+    } catch {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
