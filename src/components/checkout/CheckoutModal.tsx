@@ -1177,7 +1177,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                   )}
                 </button>
 
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-gray-500 text-center whitespace-normal break-words px-2">
                   {hasPreOrderItems
                     ? 'Te contactaremos para coordinar el pago del adelanto y la entrega.'
                     : 'Te contactaremos para coordinar el pago y la entrega.'}
