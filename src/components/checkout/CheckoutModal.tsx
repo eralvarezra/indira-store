@@ -306,6 +306,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           product_id: item.product.id,
           variant_id: item.variant?.id || null,
           variant_name: item.variant?.name || null,
+          image_url: item.product.image_url || null,
           name: item.product.name,
           price: getDiscountedPrice(effectivePrice, item.product.discount_percentage || 0),
           quantity: item.quantity,

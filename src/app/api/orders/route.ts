@@ -425,7 +425,10 @@ async function sendTelegramNotification(order: TelegramNotification) {
   const advancePayment = order.advancePayment || Math.ceil(calculatedAdvance)
 
   const formatItems = (items: OrderItem[], typeLabel: string) =>
-    items.map(item => `• ${item.name} x${item.quantity} (${typeLabel})`).join('\n')
+    items.map(item => {
+      const variant = item.variant_name ? ` — ${item.variant_name}` : ''
+      return `• ${item.name}${variant} x${item.quantity} (${typeLabel})`
+    }).join('\n')
 
   let itemsList = ''
   if (inStockItems.length > 0) {
@@ -514,6 +517,36 @@ ${order.billing_district}, ${order.billing_canton}, ${order.billing_province}
     if (!response.ok) {
       const errorData = await response.json()
       console.error('Telegram API error:', errorData)
+    }
+
+    // Send first product image if available
+    const firstItemWithImage = order.items.find(item => item.image_url)
+    if (firstItemWithImage?.image_url) {
+      const productImageUrl = firstItemWithImage.image_url.startsWith('http')
+        ? firstItemWithImage.image_url
+        : `${process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://135.181.37.72:3000'}${firstItemWithImage.image_url}`
+
+      try {
+        const productPhotoResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendPhoto`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              photo: productImageUrl,
+              caption: `🛍️ *${firstItemWithImage.name}${firstItemWithImage.variant_name ? ` — ${firstItemWithImage.variant_name}` : ''}*`,
+              parse_mode: 'Markdown',
+            }),
+          }
+        )
+        if (!productPhotoResponse.ok) {
+          const err = await productPhotoResponse.json()
+          console.error('Telegram product photo error:', err)
+        }
+      } catch (photoError) {
+        console.error('Telegram product photo error:', photoError)
+      }
     }
 
     // Send payment proof image if exists
