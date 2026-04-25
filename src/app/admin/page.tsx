@@ -910,7 +910,7 @@ export default function AdminDashboard() {
     const order = orders.find(o => o.id === orderId) as OrderWithExtras
     if (!order) return
 
-    const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
+    const orderItems = Array.isArray(order.items) ? order.items as { name: string; variant_name?: string | null; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
     const totalWithShipping = order.total_with_shipping || order.total || 0
     const currentPaid = order.amount_paid || 0
 
@@ -1352,7 +1352,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-4">
                   {filteredOrders.map((order) => {
-                    const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
+                    const orderItems = Array.isArray(order.items) ? order.items as { name: string; variant_name?: string | null; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
                     const hasPreOrder = orderItems.some(item => item.type === 'pre_order')
                     const orderWithExtras = order as OrderWithExtras
                     const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
@@ -1510,7 +1510,7 @@ export default function AdminDashboard() {
                               {orderItems.map((item, index) => (
                                 <div key={index} className="flex items-center justify-between text-sm py-1">
                                   <span className="flex items-center gap-2">
-                                    {item.name} x{item.quantity}
+                                    {item.name}{item.variant_name ? ` — ${item.variant_name}` : ''} x{item.quantity}
                                     {item.type === 'pre_order' && (
                                       <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
                                         Pre-pedido
@@ -1692,7 +1692,7 @@ export default function AdminDashboard() {
                     .map(order => {
                       const orderWithExtras = order as OrderWithExtras
                       const orderNumber = orderWithExtras.order_number || order.id.slice(0, 8).toUpperCase()
-                      const orderItems = Array.isArray(order.items) ? order.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
+                      const orderItems = Array.isArray(order.items) ? order.items as { name: string; variant_name?: string | null; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[] : []
                       const totalWithShipping = orderWithExtras.total_with_shipping || order.total || 0
                       const amountPaid = orderWithExtras.amount_paid || 0
 
@@ -1743,7 +1743,7 @@ export default function AdminDashboard() {
                             </a>
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <p className="text-xs text-gray-400">
-                                {orderItems.slice(0, 2).map(item => `${item.name} x${item.quantity}`).join(', ')}
+                                {orderItems.slice(0, 2).map(item => `${item.name}${item.variant_name ? ` — ${item.variant_name}` : ''} x${item.quantity}`).join(', ')}
                                 {orderItems.length > 2 && ` +${orderItems.length - 2} más`}
                               </p>
                               <p className="text-sm font-semibold text-[#E8775A] mt-1">
@@ -3248,10 +3248,10 @@ export default function AdminDashboard() {
               <div className="bg-gray-50 rounded-lg p-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Productos del Pedido</label>
                 <div className="space-y-2">
-                  {(editingOrder.items as { name: string; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[]).map((item, index) => (
+                  {(editingOrder.items as { name: string; variant_name?: string | null; quantity: number; price: number; type?: 'in_stock' | 'pre_order' }[]).map((item, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2">
-                        {item.name} x{item.quantity}
+                        {item.name}{item.variant_name ? ` — ${item.variant_name}` : ''} x{item.quantity}
                         {item.type === 'pre_order' && (
                           <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700">
                             Pre-pedido
