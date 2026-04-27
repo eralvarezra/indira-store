@@ -17,6 +17,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [isAdding, setIsAdding] = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [animateTransition, setAnimateTransition] = useState(false)
   const [stockWarning, setStockWarning] = useState<string | null>(null)
   const [isFlying, setIsFlying] = useState(false)
   const [flyPosition, setFlyPosition] = useState({ startX: 0, startY: 0, endX: 0, endY: 0 })
@@ -33,6 +34,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       } else {
         setSelectedVariantId(null)
       }
+      setAnimateTransition(false)
       setSelectedImageIndex(0)
       setStockWarning(null)
       justAddedRef.current = false
@@ -46,6 +48,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     const images = (product as ProductWithVariants & { images?: ProductImage[] }).images || []
     const variantImageIndex = images.findIndex(img => img.variant_id === selectedVariantId)
 
+    setAnimateTransition(false)
     if (variantImageIndex !== -1) {
       setSelectedImageIndex(variantImageIndex)
     } else {
@@ -163,6 +166,13 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const hasDiscount = discountPercentage > 0
   const discountedPrice = getDiscountedPrice(effectivePrice, discountPercentage)
 
+  function goTo(index: number) {
+    const clamped = Math.max(0, Math.min(allImages.length - 1, index))
+    if (clamped === selectedImageIndex) return
+    setAnimateTransition(true)
+    setSelectedImageIndex(clamped)
+  }
+
   return (
     <>
       {/* Flying animation element */}
@@ -212,19 +222,42 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="sm:w-1/2 p-4 sm:p-6">
                 <div
                   ref={imageRef}
-                  className="relative aspect-square bg-[color:var(--color-cream)] rounded-2xl overflow-hidden flex items-center justify-center"
+                  className="relative aspect-square bg-[color:var(--color-cream)] rounded-2xl overflow-hidden"
                 >
-                  {allImages.length > 0 && allImages[selectedImageIndex]?.image_url ? (
-                    <img
-                      src={allImages[selectedImageIndex].image_url}
-                      alt={product.name}
-                      className="w-full h-full object-contain p-4"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="w-16 h-16 bg-gray-200 rounded-full" />
-                    </div>
-                  )}
+                  {/* Carousel track — all images side by side, only one visible */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      height: '100%',
+                      width: '100%',
+                      transform: `translate3d(-${selectedImageIndex * 100}%, 0, 0)`,
+                      willChange: 'transform',
+                      transition: animateTransition
+                        ? 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1)'
+                        : 'none',
+                    }}
+                  >
+                    {allImages.length > 0 ? allImages.map((image, index) => (
+                      <div
+                        key={index}
+                        style={{ flex: '0 0 100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {image.image_url ? (
+                          <img
+                            src={image.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-contain p-4"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-200 rounded-full" />
+                        )}
+                      </div>
+                    )) : (
+                      <div style={{ flex: '0 0 100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="w-16 h-16 bg-gray-200 rounded-full" />
+                      </div>
+                    )}
+                  </div>
 
                   {/* Discount Badge */}
                   {hasDiscount && (
@@ -237,13 +270,13 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   {hasMultipleImages && (
                     <>
                       <button
-                        onClick={() => setSelectedImageIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1)}
+                        onClick={() => goTo(selectedImageIndex === 0 ? allImages.length - 1 : selectedImageIndex - 1)}
                         className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-md transition-colors"
                       >
                         <ChevronLeft className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => setSelectedImageIndex(prev => prev === allImages.length - 1 ? 0 : prev + 1)}
+                        onClick={() => goTo(selectedImageIndex === allImages.length - 1 ? 0 : selectedImageIndex + 1)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow-md transition-colors"
                       >
                         <ChevronRight className="w-5 h-5" />
@@ -258,7 +291,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     {allImages.map((image, index) => (
                       <button
                         key={index}
-                        onClick={() => setSelectedImageIndex(index)}
+                        onClick={() => goTo(index)}
+                        aria-label={`Ver imagen ${index + 1}`}
+                        aria-current={index === selectedImageIndex ? 'true' : undefined}
                         className={clsx(
                           'flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-colors bg-[color:var(--color-cream)] flex items-center justify-center',
                           index === selectedImageIndex ? 'border-[color:var(--color-brand)]' : 'border-transparent hover:border-[color:var(--color-hairline)]'
